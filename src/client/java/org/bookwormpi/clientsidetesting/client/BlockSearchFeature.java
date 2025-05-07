@@ -4,6 +4,9 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.render.*;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
+import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
@@ -19,18 +22,48 @@ import java.util.List;
 public class BlockSearchFeature {
     public static boolean enabled = false;
     public static Block blockToSearch = Blocks.DIAMOND_BLOCK;
+    public static int scanDistance = -1; // -1 means use render distance by default
     private static final List<BlockPos> foundBlocks = new ArrayList<>();
     public static ChunkPos lastPlayerChunk = null;
     private static MinecraftClient lastClient = null;
+    private static long lastScanTime = 0;
+    private static boolean scanRequested = false;
 
     public static void register() {
         WorldRenderEvents.AFTER_ENTITIES.register(BlockSearchFeature::onWorldRender);
+        // Listen for chunk load/unload and trigger rescan
+        ClientChunkEvents.CHUNK_LOAD.register((world, chunk) -> {
+            if (enabled && MinecraftClient.getInstance().player != null) {
+                rescanBlocks(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos());
+            }
+        });
+        ClientChunkEvents.CHUNK_UNLOAD.register((world, chunk) -> {
+            if (enabled && MinecraftClient.getInstance().player != null) {
+                rescanBlocks(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos());
+            }
+        });
+        PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
+            if (enabled && !world.isClient) return;
+            scanRequested = true;
+        });
+        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+            if (enabled && world.isClient) {
+                scanRequested = true;
+            }
+            return net.minecraft.util.ActionResult.PASS;
+        });
     }
 
     private static void onWorldRender(WorldRenderContext context) {
-        if (!enabled) return;
+        if (!enabled || blockToSearch == null) return;
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.world == null || client.player == null) return;
+        long now = client.world.getTime();
+        if (scanRequested && now - lastScanTime >= 20) {
+            rescanBlocks(client, client.player.getChunkPos());
+            lastScanTime = now;
+            scanRequested = false;
+        }
 
         ChunkPos currentChunk = client.player.getChunkPos();
         if (lastPlayerChunk == null || !lastPlayerChunk.equals(currentChunk) || client != lastClient) {
@@ -41,57 +74,77 @@ public class BlockSearchFeature {
 
         MatrixStack matrices = context.matrixStack();
         Vec3d cam = context.camera().getPos();
-        
         VertexConsumerProvider.Immediate immediate = client.getBufferBuilders().getEntityVertexConsumers();
-        VertexConsumer lines = immediate.getBuffer(RenderLayer.getLines());
+        VertexConsumer quads = immediate.getBuffer(RenderLayer.getGuiOverlay());
 
+        float r = 1.0F, g = 0.0F, b = 0.0F, a = 0.3F;
+        double min = 0.375, max = 0.625;
         for (BlockPos pos : foundBlocks) {
-            float offset = 0.05f;
-            double x1 = pos.getX() - cam.x - offset;
-            double y1 = pos.getY() - cam.y - offset;
-            double z1 = pos.getZ() - cam.z - offset;
-            double x2 = x1 + 1 + (offset * 2);
-            double y2 = y1 + 1 + (offset * 2);
-            double z2 = z1 + 1 + (offset * 2);
-
-            // Draw edges
-            drawLine(matrices.peek(), lines, x1, y1, z1, x2, y1, z1);
-            drawLine(matrices.peek(), lines, x2, y1, z1, x2, y1, z2);
-            drawLine(matrices.peek(), lines, x2, y1, z2, x1, y1, z2);
-            drawLine(matrices.peek(), lines, x1, y1, z2, x1, y1, z1);
-
-            drawLine(matrices.peek(), lines, x1, y2, z1, x2, y2, z1);
-            drawLine(matrices.peek(), lines, x2, y2, z1, x2, y2, z2);
-            drawLine(matrices.peek(), lines, x2, y2, z2, x1, y2, z2);
-            drawLine(matrices.peek(), lines, x1, y2, z2, x1, y2, z1);
-
-            drawLine(matrices.peek(), lines, x1, y1, z1, x1, y2, z1);
-            drawLine(matrices.peek(), lines, x2, y1, z1, x2, y2, z1);
-            drawLine(matrices.peek(), lines, x2, y1, z2, x2, y2, z2);
-            drawLine(matrices.peek(), lines, x1, y1, z2, x1, y2, z2);
+            double x = pos.getX() - cam.x;
+            double y = pos.getY() - cam.y;
+            double z = pos.getZ() - cam.z;
+            // Bottom face (y = min)
+            drawQuad(matrices, quads, x + min, y + min, z + min, max - min, 0, 0, 0, 0, max - min, r, g, b, a, 0, -1, 0);
+            drawQuadReversed(matrices, quads, x + min, y + min, z + min, max - min, 0, 0, 0, 0, max - min, r, g, b, a, 0, 1, 0);
+            // Top face (y = max)
+            drawQuad(matrices, quads, x + min, y + max, z + min, max - min, 0, 0, 0, 0, max - min, r, g, b, a, 0, 1, 0);
+            drawQuadReversed(matrices, quads, x + min, y + max, z + min, max - min, 0, 0, 0, 0, max - min, r, g, b, a, 0, -1, 0);
+            // North face (z = min)
+            drawQuad(matrices, quads, x + min, y + min, z + min, max - min, 0, 0, 0, max - min, 0, r, g, b, a, 0, 0, -1);
+            drawQuadReversed(matrices, quads, x + min, y + min, z + min, max - min, 0, 0, 0, max - min, 0, r, g, b, a, 0, 0, 1);
+            // South face (z = max)
+            drawQuad(matrices, quads, x + min, y + min, z + max, max - min, 0, 0, 0, max - min, 0, r, g, b, a, 0, 0, 1);
+            drawQuadReversed(matrices, quads, x + min, y + min, z + max, max - min, 0, 0, 0, max - min, 0, r, g, b, a, 0, 0, -1);
+            // West face (x = min)
+            drawQuad(matrices, quads, x + min, y + min, z + min, 0, max - min, 0, 0, 0, max - min, r, g, b, a, -1, 0, 0);
+            drawQuadReversed(matrices, quads, x + min, y + min, z + min, 0, max - min, 0, 0, 0, max - min, r, g, b, a, 1, 0, 0);
+            // East face (x = max)
+            drawQuad(matrices, quads, x + max, y + min, z + min, 0, max - min, 0, 0, 0, max - min, r, g, b, a, 1, 0, 0);
+            drawQuadReversed(matrices, quads, x + max, y + min, z + min, 0, max - min, 0, 0, 0, max - min, r, g, b, a, -1, 0, 0);
         }
-
         immediate.draw();
     }
 
-    private static void drawLine(MatrixStack.Entry matrices, VertexConsumer lines, 
-                               double x1, double y1, double z1, 
-                               double x2, double y2, double z2) {
-        lines.vertex(matrices.getPositionMatrix(), (float)x1, (float)y1, (float)z1)
-            .color(1.0f, 0.0f, 0.0f, 1.0f)
-            .normal(1.0f, 0.0f, 0.0f);
-        lines.vertex(matrices.getPositionMatrix(), (float)x2, (float)y2, (float)z2)
-            .color(1.0f, 0.0f, 0.0f, 1.0f)
-            .normal(1.0f, 0.0f, 0.0f);
+    private static void drawQuad(MatrixStack matrices, VertexConsumer buffer,
+                                double x, double y, double z,
+                                double dx1, double dy1, double dz1,
+                                double dx2, double dy2, double dz2,
+                                float r, float g, float b, float a,
+                                float nx, float ny, float nz) {
+        MatrixStack.Entry entry = matrices.peek();
+        buffer.vertex(entry.getPositionMatrix(), (float)x, (float)y, (float)z).color(r, g, b, a).normal(nx, ny, nz);
+        buffer.vertex(entry.getPositionMatrix(), (float)(x + dx1), (float)(y + dy1), (float)(z + dz1)).color(r, g, b, a).normal(nx, ny, nz);
+        buffer.vertex(entry.getPositionMatrix(), (float)(x + dx1 + dx2), (float)(y + dy1 + dy2), (float)(z + dz1 + dz2)).color(r, g, b, a).normal(nx, ny, nz);
+        buffer.vertex(entry.getPositionMatrix(), (float)(x + dx2), (float)(y + dy2), (float)(z + dz2)).color(r, g, b, a).normal(nx, ny, nz);
+    }
+
+    private static void drawQuadReversed(MatrixStack matrices, VertexConsumer buffer,
+                                double x, double y, double z,
+                                double dx1, double dy1, double dz1,
+                                double dx2, double dy2, double dz2,
+                                float r, float g, float b, float a,
+                                float nx, float ny, float nz) {
+        MatrixStack.Entry entry = matrices.peek();
+        buffer.vertex(entry.getPositionMatrix(), (float)x, (float)y, (float)z).color(r, g, b, a).normal(nx, ny, nz);
+        buffer.vertex(entry.getPositionMatrix(), (float)(x + dx2), (float)(y + dy2), (float)(z + dz2)).color(r, g, b, a).normal(nx, ny, nz);
+        buffer.vertex(entry.getPositionMatrix(), (float)(x + dx1 + dx2), (float)(y + dy1 + dy2), (float)(z + dz1 + dz2)).color(r, g, b, a).normal(nx, ny, nz);
+        buffer.vertex(entry.getPositionMatrix(), (float)(x + dx1), (float)(y + dy1), (float)(z + dz1)).color(r, g, b, a).normal(nx, ny, nz);
+    }
+
+    private static boolean isFaceVisible(Vec3d cam, double fx, double fy, double fz, double nx, double ny, double nz) {
+        double dx = cam.x - fx;
+        double dy = cam.y - fy;
+        double dz = cam.z - fz;
+        double dot = dx * nx + dy * ny + dz * nz;
+        return dot < 0;
     }
 
     public static void rescanBlocks(MinecraftClient client, ChunkPos playerChunk) {
         if (!enabled || client.world == null) return;
         foundBlocks.clear();
-        int renderDistance = client.options.getViewDistance().getValue();
-        
-        for (int dx = -renderDistance; dx <= renderDistance; dx++) {
-            for (int dz = -renderDistance; dz <= renderDistance; dz++) {
+        int distance = scanDistance > 0 ? scanDistance : (client.options != null ? client.options.getViewDistance().getValue() : 8);
+        for (int dx = -distance; dx <= distance; dx++) {
+            for (int dz = -distance; dz <= distance; dz++) {
                 ChunkPos chunkPos = new ChunkPos(playerChunk.x + dx, playerChunk.z + dz);
                 if (!client.world.getChunkManager().isChunkLoaded(chunkPos.x, chunkPos.z)) continue;
                 

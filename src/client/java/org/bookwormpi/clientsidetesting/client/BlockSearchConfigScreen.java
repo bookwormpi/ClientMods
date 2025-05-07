@@ -5,13 +5,9 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.render.item.ItemRenderer;
-import net.minecraft.client.texture.Sprite;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.ChunkPos;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -31,7 +27,6 @@ public class BlockSearchConfigScreen extends Screen {
     private List<Block> filteredBlocks;
     private final int backgroundColor = 0xFF202020;
     private final int searchBarColor = 0xFF404040;
-    private final int textColor = 0xFFFFFFFF;
 
     public BlockSearchConfigScreen(Screen parent) {
         super(Text.translatable("blocksearch.screen.title"));
@@ -63,7 +58,7 @@ public class BlockSearchConfigScreen extends Screen {
         searchField.setPlaceholder(Text.literal("Search..."));
         searchField.setDrawsBackground(true);
         searchField.setVisible(true);
-        searchField.setFocused(true);
+        searchField.setFocused(true); // Focus the search box so the cursor is active
         searchField.setText(searchText);
         searchField.setChangedListener(this::onSearchChanged);
         addSelectableChild(searchField);
@@ -78,6 +73,7 @@ public class BlockSearchConfigScreen extends Screen {
     private void updateFilteredBlocks() {
         filteredBlocks = allBlocks.stream()
             .filter(block -> {
+                if (block.getDefaultState().isAir()) return false;
                 String name = block.getName().getString().toLowerCase();
                 String id = Registries.BLOCK.getId(block).toString().toLowerCase();
                 return name.contains(searchText) || id.contains(searchText);
