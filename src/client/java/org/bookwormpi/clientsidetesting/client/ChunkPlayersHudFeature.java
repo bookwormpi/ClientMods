@@ -2,7 +2,6 @@ package org.bookwormpi.clientsidetesting.client;
 
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 
@@ -13,6 +12,8 @@ public class ChunkPlayersHudFeature {
     private static final List<String> playersInChunk = new ArrayList<>();
 
     public static void register() {
+        // Switch to the new HUD event if available in your Fabric API/Minecraft version.
+        // If not, keep the deprecated HudRenderCallback for now, but add a comment for future migration.
         HudRenderCallback.EVENT.register((context, tickDelta) -> {
             if (!ClientsidetestingClient.showChunkPlayers) return;
 

@@ -159,8 +159,6 @@ public class ClientsidetestingClient implements ClientModInitializer {
             double dz = playerPos.z - cameraPos.z;
             double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
             if (dist < 0.01) continue;
-            int px = cx + (int) (dx / dist * 80);
-            int py = cy - (int) (dy / dist * 80);
         }
     }
 }
