@@ -21,11 +21,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class BlockSearchFeature {
     public static boolean enabled = false;
     public static Block blockToSearch = Blocks.DIAMOND_BLOCK;
-    public static int scanDistance = -1; // -1 means use render distance by default
+    public static int maxRenderedBlocks = 256;
+    public static int scanIntervalTicks = 5;
     private static final List<BlockPos> foundBlocks = new ArrayList<>();
     public static ChunkPos lastPlayerChunk = null;
     private static MinecraftClient lastClient = null;
     private static long lastScanTime = 0;
+    private static long lastFixedScanTime = 0;
     private static boolean scanRequested = false;
     private static final int MAX_SCAN_DISTANCE = 16;
     private static final AtomicBoolean scanning = new AtomicBoolean(false);
@@ -71,27 +73,55 @@ public class BlockSearchFeature {
 
     private static List<BlockPos> scanBlocks(MinecraftClient client, ChunkPos playerChunk) {
         List<BlockPos> results = new ArrayList<>();
-        int distance = scanDistance > 0 ? Math.min(scanDistance, MAX_SCAN_DISTANCE) : (client.options != null ? Math.min(client.options.getViewDistance().getValue(), MAX_SCAN_DISTANCE) : 8);
+        int distance = (client.options != null ? Math.min(client.options.getViewDistance().getValue(), MAX_SCAN_DISTANCE) : 8);
+        Vec3d playerPos = client.player.getPos();
+        java.util.PriorityQueue<BlockPos> closestBlocks = new java.util.PriorityQueue<>(
+            (a, b) -> {
+                double da = a.getSquaredDistance(playerPos.x, playerPos.y, playerPos.z);
+                double db = b.getSquaredDistance(playerPos.x, playerPos.y, playerPos.z);
+                return Double.compare(db, da); // max-heap: farthest first
+            }
+        );
+        // Collect all chunk positions in range
+        List<ChunkPos> chunkPositions = new ArrayList<>();
         for (int dx = -distance; dx <= distance; dx++) {
             for (int dz = -distance; dz <= distance; dz++) {
-                ChunkPos chunkPos = new ChunkPos(playerChunk.x + dx, playerChunk.z + dz);
-                if (!client.world.getChunkManager().isChunkLoaded(chunkPos.x, chunkPos.z)) continue;
-                var chunk = client.world.getChunk(chunkPos.x, chunkPos.z);
-                var chunkSections = chunk.getSectionArray();
-                int bottomY = chunk.getBottomY();
-                for (int sectionY = 0; sectionY < chunkSections.length; sectionY++) {
-                    var section = chunkSections[sectionY];
-                    if (section == null || section.isEmpty()) continue;
-                    int yOffset = (sectionY * 16) + bottomY;
-                    for (int x = 0; x < 16; x++) {
-                        for (int z = 0; z < 16; z++) {
-                            for (int y = 0; y < 16; y++) {
-                                if (section.getBlockState(x, y, z).isOf(blockToSearch)) {
-                                    results.add(new BlockPos(
-                                        chunkPos.getStartX() + x,
-                                        yOffset + y,
-                                        chunkPos.getStartZ() + z
-                                    ));
+                chunkPositions.add(new ChunkPos(playerChunk.x + dx, playerChunk.z + dz));
+            }
+        }
+        // Sort chunk positions by minimum squared distance to player
+        chunkPositions.sort((a, b) -> {
+            double da = minChunkDistanceSq(a, playerPos);
+            double db = minChunkDistanceSq(b, playerPos);
+            return Double.compare(da, db);
+        });
+        for (ChunkPos chunkPos : chunkPositions) {
+            // Early culling: skip chunk if its min distance is farther than farthest in queue
+            if (closestBlocks.size() >= maxRenderedBlocks) {
+                double farthestSq = closestBlocks.peek().getSquaredDistance(playerPos.x, playerPos.y, playerPos.z);
+                double chunkMinSq = minChunkDistanceSq(chunkPos, playerPos);
+                if (chunkMinSq > farthestSq) continue;
+            }
+            if (!client.world.getChunkManager().isChunkLoaded(chunkPos.x, chunkPos.z)) continue;
+            var chunk = client.world.getChunk(chunkPos.x, chunkPos.z);
+            var chunkSections = chunk.getSectionArray();
+            int bottomY = chunk.getBottomY();
+            for (int sectionY = 0; sectionY < chunkSections.length; sectionY++) {
+                var section = chunkSections[sectionY];
+                if (section == null || section.isEmpty()) continue;
+                int yOffset = (sectionY * 16) + bottomY;
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        for (int y = 0; y < 16; y++) {
+                            if (section.getBlockState(x, y, z).isOf(blockToSearch)) {
+                                BlockPos pos = new BlockPos(
+                                    chunkPos.getStartX() + x,
+                                    yOffset + y,
+                                    chunkPos.getStartZ() + z
+                                );
+                                closestBlocks.add(pos);
+                                if (closestBlocks.size() > maxRenderedBlocks) {
+                                    closestBlocks.poll(); // remove farthest
                                 }
                             }
                         }
@@ -99,7 +129,26 @@ public class BlockSearchFeature {
                 }
             }
         }
+        results.addAll(closestBlocks);
+        // Sort results by distance ascending
+        results.sort((a, b) -> {
+            double da = a.getSquaredDistance(playerPos.x, playerPos.y, playerPos.z);
+            double db = b.getSquaredDistance(playerPos.x, playerPos.y, playerPos.z);
+            return Double.compare(da, db);
+        });
         return results;
+    }
+
+    // Helper to compute minimum squared distance from a chunk to the player
+    private static double minChunkDistanceSq(ChunkPos chunkPos, Vec3d playerPos) {
+        int minX = chunkPos.getStartX();
+        int minZ = chunkPos.getStartZ();
+        int maxX = chunkPos.getEndX();
+        int maxZ = chunkPos.getEndZ();
+        double dx = Math.max(0, Math.max(minX - playerPos.x, playerPos.x - maxX));
+        double dz = Math.max(0, Math.max(minZ - playerPos.z, playerPos.z - maxZ));
+        // Y is not considered for chunk culling, as we scan all Y
+        return dx * dx + dz * dz;
     }
 
     private static void onWorldRender(WorldRenderContext context) {
@@ -107,6 +156,11 @@ public class BlockSearchFeature {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.world == null || client.player == null) return;
         long now = client.world.getTime();
+        // Fixed interval rescan every scanIntervalTicks
+        if (now - lastFixedScanTime >= scanIntervalTicks && !scanning.get()) {
+            requestScan(client, client.player.getChunkPos());
+            lastFixedScanTime = now;
+        }
         if (scanRequested && now - lastScanTime >= 20 && !scanning.get()) {
             requestScan(client, client.player.getChunkPos());
             lastScanTime = now;
@@ -133,7 +187,17 @@ public class BlockSearchFeature {
         float g = ((rgb >> 8) & 0xFF) / 255.0f;
         float b = (rgb & 0xFF) / 255.0f;
         float a = 0.5F;
-        for (BlockPos pos : foundBlocks) {
+        // Limit the number of rendered blocks, prioritizing closest to camera
+        int maxBlocks = Math.max(1, maxRenderedBlocks);
+        List<BlockPos> sortedBlocks = foundBlocks.stream()
+            .sorted((aPos, bPos) -> {
+                double da = aPos.getSquaredDistance(cam.x, cam.y, cam.z);
+                double db = bPos.getSquaredDistance(cam.x, cam.y, cam.z);
+                return Double.compare(da, db);
+            })
+            .limit(maxBlocks)
+            .toList();
+        for (BlockPos pos : sortedBlocks) {
             double x = pos.getX() - cam.x;
             double y = pos.getY() - cam.y;
             double z = pos.getZ() - cam.z;

@@ -12,7 +12,6 @@ public class ClientsideTestingConfigScreen extends Screen {
     private static final int BUTTON_HEIGHT = 18;
     private int scrollOffset = 0;
     private int contentHeight = 0;
-    private SliderWidget scanDistanceSlider;
 
     public ClientsideTestingConfigScreen() {
         super(Text.literal("Clientside Testing Features"));
@@ -23,7 +22,6 @@ public class ClientsideTestingConfigScreen extends Screen {
         clearChildren();
         int padding = 16;
         int panelWidth = width - padding * 2;
-        int panelHeight = height - padding * 2;
         int panelX = padding;
         int panelY = padding;
         int colPad = 16;
@@ -60,6 +58,7 @@ public class ClientsideTestingConfigScreen extends Screen {
                 Text.literal("+"),
                 btn -> { int maxRadius = MinecraftClient.getInstance().options.getViewDistance().getValue(); if (ClientsidetestingClient.chunkCheckRadius < maxRadius) { ClientsidetestingClient.chunkCheckRadius++; } }
         ).dimensions(leftX + indent + 50, yLeft, 40, BUTTON_HEIGHT).build());
+        yLeft += BUTTON_HEIGHT + 2;
         yLeft += BUTTON_HEIGHT + sectionPad;
         // Right column: Player Boxes
         this.addDrawableChild(ButtonWidget.builder(
@@ -93,24 +92,43 @@ public class ClientsideTestingConfigScreen extends Screen {
                 btn -> { BlockSearchFeature.enabled = true; BlockSearchFeature.lastPlayerChunk = null; if (MinecraftClient.getInstance().world != null && MinecraftClient.getInstance().player != null) { BlockSearchFeature.rescanBlocks(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos()); } }
         ).dimensions(rightX + indent, yRight, buttonWidth - indent, BUTTON_HEIGHT).build());
         yRight += BUTTON_HEIGHT + 2;
-        // Scan Distance Slider
-        int sliderMin = 1;
-        int sliderMax = 16;
-        int sliderValue = BlockSearchFeature.scanDistance > 0 ? BlockSearchFeature.scanDistance : 8;
-        scanDistanceSlider = new SliderWidget(rightX + indent, yRight, buttonWidth - indent, BUTTON_HEIGHT, Text.literal("Scan Distance: " + sliderValue), (sliderValue - sliderMin) / (float)(sliderMax - sliderMin)) {
+        // Max Rendered Blocks Slider (now directly under Scan button)
+        int maxBlocksMin = 16;
+        int maxBlocksMax = 1024;
+        int maxBlocksValue = BlockSearchFeature.maxRenderedBlocks > 0 ? BlockSearchFeature.maxRenderedBlocks : 256;
+        SliderWidget maxBlocksSlider = new SliderWidget(rightX + indent, yRight, buttonWidth - indent, BUTTON_HEIGHT, Text.literal("Max Rendered Blocks: " + maxBlocksValue), (maxBlocksValue - maxBlocksMin) / (float)(maxBlocksMax - maxBlocksMin)) {
             @Override
             protected void updateMessage() {
-                setMessage(Text.literal("Scan Distance: " + getIntValue()));
+                setMessage(Text.literal("Max Rendered Blocks: " + getIntValue()));
             }
             @Override
             protected void applyValue() {
-                BlockSearchFeature.scanDistance = getIntValue();
+                BlockSearchFeature.maxRenderedBlocks = getIntValue();
             }
             private int getIntValue() {
-                return sliderMin + (int)Math.round((sliderMax - sliderMin) * this.value);
+                return maxBlocksMin + (int)Math.round((maxBlocksMax - maxBlocksMin) * this.value);
             }
         };
-        this.addDrawableChild(scanDistanceSlider);
+        this.addDrawableChild(maxBlocksSlider);
+        yRight += BUTTON_HEIGHT + 2;
+        // Scan Interval Slider (1-40 ticks)
+        int minInterval = 1;
+        int maxInterval = 40;
+        int intervalValue = BlockSearchFeature.scanIntervalTicks > 0 ? BlockSearchFeature.scanIntervalTicks : 5;
+        SliderWidget intervalSlider = new SliderWidget(rightX + indent, yRight, buttonWidth - indent, BUTTON_HEIGHT, Text.literal("Scan Interval: " + intervalValue + " ticks"), (intervalValue - minInterval) / (float)(maxInterval - minInterval)) {
+            @Override
+            protected void updateMessage() {
+                setMessage(Text.literal("Scan Interval: " + getIntValue() + " ticks"));
+            }
+            @Override
+            protected void applyValue() {
+                BlockSearchFeature.scanIntervalTicks = getIntValue();
+            }
+            private int getIntValue() {
+                return minInterval + (int)Math.round((maxInterval - minInterval) * this.value);
+            }
+        };
+        this.addDrawableChild(intervalSlider);
         yRight += BUTTON_HEIGHT + sectionPad;
         // Done button (always at the bottom of the panel)
         int doneY = Math.max(yLeft, yRight) + 8;
