@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import org.bookwormpi.clientsidetesting.client.combat.CombatHudFeature;
+import org.bookwormpi.clientsidetesting.client.tools.ToolSwapFeature;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,10 +65,8 @@ public class ClientsidetestingClient implements ClientModInitializer {
         });
         
         // Register features
-        BlockSearchFeature.register();
-        ChunkPlayersHudFeature.register();
-        PlayerBoxRenderFeature.register();
         CombatHudFeature.register();
+        ToolSwapFeature.register();
         
         LOGGER.info("Client Side Testing mod initialized");
     }
