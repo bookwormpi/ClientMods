@@ -59,7 +59,34 @@ public class ClientsideTestingConfigScreen extends Screen {
                 btn -> { int maxRadius = MinecraftClient.getInstance().options.getViewDistance().getValue(); if (ClientsidetestingClient.chunkCheckRadius < maxRadius) { ClientsidetestingClient.chunkCheckRadius++; } }
         ).dimensions(leftX + indent + 50, yLeft, 40, BUTTON_HEIGHT).build());
         yLeft += BUTTON_HEIGHT + 2;
+        
+        // Left column: Combat HUD
+        this.addDrawableChild(ButtonWidget.builder(
+                Text.literal("Combat HUD").formatted(Formatting.BOLD),
+                btn -> {}
+        ).dimensions(leftX, yLeft, buttonWidth, BUTTON_HEIGHT).build()).active = false;
+        yLeft += BUTTON_HEIGHT + 2;
+        this.addDrawableChild(ButtonWidget.builder(
+                Text.literal("Toggle Combat HUD: " + (ClientsidetestingClient.showCombatHud ? "ON" : "OFF")),
+                btn -> { ClientsidetestingClient.showCombatHud = !ClientsidetestingClient.showCombatHud; this.init(); }
+        ).dimensions(leftX + indent, yLeft, buttonWidth - indent, BUTTON_HEIGHT).build());
+        yLeft += BUTTON_HEIGHT + 2;
+        this.addDrawableChild(ButtonWidget.builder(
+                Text.literal("Target Cycle: M"),
+                btn -> {}
+        ).dimensions(leftX + indent, yLeft, buttonWidth - indent, BUTTON_HEIGHT).build()).active = false;
+        yLeft += BUTTON_HEIGHT + 2;
+        this.addDrawableChild(ButtonWidget.builder(
+                Text.literal("Aim Lock: L"),
+                btn -> {}
+        ).dimensions(leftX + indent, yLeft, buttonWidth - indent, BUTTON_HEIGHT).build()).active = false;
+        yLeft += BUTTON_HEIGHT + 2;
+        this.addDrawableChild(ButtonWidget.builder(
+                Text.literal("Open Settings: G"),
+                btn -> {}
+        ).dimensions(leftX + indent, yLeft, buttonWidth - indent, BUTTON_HEIGHT).build()).active = false;
         yLeft += BUTTON_HEIGHT + sectionPad;
+        
         // Right column: Player Boxes
         this.addDrawableChild(ButtonWidget.builder(
                 Text.literal("Player Boxes").formatted(Formatting.BOLD),

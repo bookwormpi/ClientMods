@@ -17,8 +17,10 @@ public class ClientsidetestingClient implements ClientModInitializer {
     public static int chunkCheckRadius = 3;
     public static boolean showCombatHud = true;
     
-    // Combat HUD key binding
+    // Key bindings
     private static KeyBinding targetCycleKey;
+    private static KeyBinding aimLockKey;
+    private static KeyBinding configScreenKey;
 
     @Override
     public void onInitializeClient() {
@@ -32,10 +34,32 @@ public class ClientsidetestingClient implements ClientModInitializer {
                 "category.clientsidetesting.combat"
         ));
         
+        // Register aim lock key
+        aimLockKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.clientsidetesting.aim_lock",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_L,
+                "category.clientsidetesting.combat"
+        ));
+        
+        // Register config screen key
+        configScreenKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.clientsidetesting.config",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_G,
+                "category.clientsidetesting.general"
+        ));
+        
         // Register tick event for key handling
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (targetCycleKey.wasPressed() && showCombatHud) {
                 CombatHudFeature.handleTargetCycleKeyPress();
+            }
+            if (aimLockKey.wasPressed() && showCombatHud) {
+                CombatHudFeature.handleAimLockKeyPress();
+            }
+            if (configScreenKey.wasPressed()) {
+                client.setScreen(new ClientsideTestingConfigScreen());
             }
         });
         
