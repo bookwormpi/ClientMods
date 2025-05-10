@@ -13,7 +13,6 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.Box;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -28,8 +27,6 @@ public class BlockSearchFeature {
     private static final List<BlockPos> foundBlocks = new ArrayList<>();
     public static ChunkPos lastPlayerChunk = null;
     private static MinecraftClient lastClient = null;
-    private static long lastScanTime = 0;
-    private static boolean scanRequested = false;
     private static final int MAX_SCAN_DISTANCE = 16;
     private static final AtomicBoolean scanning = new AtomicBoolean(false);
     private static long lastScanTick = 0;
@@ -50,12 +47,12 @@ public class BlockSearchFeature {
         });
         PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
             if (enabled && world.isClient) {
-                scanRequested = true;
+                scanning.set(true);
             }
         });
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
             if (enabled && world.isClient) {
-                scanRequested = true;
+                scanning.set(true);
             }
             return net.minecraft.util.ActionResult.PASS;
         });
@@ -158,7 +155,6 @@ public class BlockSearchFeature {
         if (!scanning.get() && (now - lastScanTick >= scanIntervalTicks)) {
             requestScan(client, client.player.getChunkPos());
             lastScanTick = now;
-            scanRequested = false;
         }
         // Chunk movement trigger
         ChunkPos currentChunk = client.player.getChunkPos();
@@ -231,21 +227,6 @@ public class BlockSearchFeature {
         buffer.vertex(entry.getPositionMatrix(), (float)(x + dx2), (float)(y + dy2), (float)(z + dz2)).color(r, g, b, a).normal(nx, ny, nz);
         buffer.vertex(entry.getPositionMatrix(), (float)(x + dx1 + dx2), (float)(y + dy1 + dy2), (float)(z + dz1 + dz2)).color(r, g, b, a).normal(nx, ny, nz);
         buffer.vertex(entry.getPositionMatrix(), (float)(x + dx1), (float)(y + dy1), (float)(z + dz1)).color(r, g, b, a).normal(nx, ny, nz);
-    }
-
-    private static void drawLine(MatrixStack.Entry entry, VertexConsumer consumer,
-                                 double x1, double y1, double z1,
-                                 double x2, double y2, double z2,
-                                 float r, float g, float b, float a,
-                                 int light) {
-        consumer.vertex(entry.getPositionMatrix(), (float)x1, (float)y1, (float)z1)
-                .color(r, g, b, a)
-                .light(light)
-                .normal(0.0f, 1.0f, 0.0f);
-        consumer.vertex(entry.getPositionMatrix(), (float)x2, (float)y2, (float)z2)
-                .color(r, g, b, a)
-                .light(light)
-                .normal(0.0f, 1.0f, 0.0f);
     }
 
     public static void rescanBlocks(MinecraftClient client, ChunkPos playerChunk) {

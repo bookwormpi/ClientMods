@@ -7,7 +7,6 @@ import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import org.bookwormpi.clientsidetesting.client.combat.CombatHudFeature;
 import org.bookwormpi.clientsidetesting.client.tools.ToolSwapFeature;
-import org.bookwormpi.clientsidetesting.client.BlockSearchFeature;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
