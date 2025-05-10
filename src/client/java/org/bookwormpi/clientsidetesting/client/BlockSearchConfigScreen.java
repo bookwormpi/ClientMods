@@ -163,6 +163,10 @@ public class BlockSearchConfigScreen extends Screen {
             if (index >= 0 && index < filteredBlocks.size()) {
                 BlockSearchFeature.blockToSearch = filteredBlocks.get(index);
                 BlockSearchFeature.enabled = true;
+                if (MinecraftClient.getInstance().player != null) {
+                    System.out.println("[BlockSearchConfigScreen] Block selected, requesting scan...");
+                    BlockSearchFeature.requestScan(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos());
+                }
                 MinecraftClient.getInstance().setScreen(parent);
                 return true;
             }

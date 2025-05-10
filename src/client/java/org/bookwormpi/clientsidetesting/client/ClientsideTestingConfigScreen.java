@@ -135,7 +135,14 @@ public class ClientsideTestingConfigScreen extends Screen {
         yRight += BUTTON_HEIGHT + 2;
         this.addDrawableChild(ButtonWidget.builder(
                 Text.literal("Toggle Block Search: " + (BlockSearchFeature.enabled ? "ON" : "OFF")),
-                btn -> { BlockSearchFeature.enabled = !BlockSearchFeature.enabled; this.init(); }
+                btn -> {
+                    BlockSearchFeature.enabled = !BlockSearchFeature.enabled;
+                    this.init();
+                    if (BlockSearchFeature.enabled && MinecraftClient.getInstance().player != null) {
+                        System.out.println("[ConfigScreen] Block Search toggled ON, requesting scan...");
+                        BlockSearchFeature.requestScan(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos());
+                    }
+                }
         ).dimensions(rightX + indent, yRight, buttonWidth - indent, BUTTON_HEIGHT).build());
         yRight += BUTTON_HEIGHT + 2;
         this.addDrawableChild(ButtonWidget.builder(
