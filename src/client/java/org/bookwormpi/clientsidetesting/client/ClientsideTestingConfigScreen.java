@@ -7,8 +7,6 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import org.bookwormpi.clientsidetesting.client.tools.ToolSwapConfigScreen;
-import org.bookwormpi.clientsidetesting.client.tools.ToolSwapFeature;
 
 public class ClientsideTestingConfigScreen extends Screen {
     private static final int BUTTON_HEIGHT = 18;
@@ -85,33 +83,6 @@ public class ClientsideTestingConfigScreen extends Screen {
         yLeft += BUTTON_HEIGHT + 2;
         this.addDrawableChild(ButtonWidget.builder(
                 Text.literal("Open Settings: G"),
-                btn -> {}
-        ).dimensions(leftX + indent, yLeft, buttonWidth - indent, BUTTON_HEIGHT).build()).active = false;
-        yLeft += BUTTON_HEIGHT + sectionPad;
-        
-        // Left column: Tool Swap
-        this.addDrawableChild(ButtonWidget.builder(
-                Text.literal("Tool Swap").formatted(Formatting.BOLD),
-                btn -> {}
-        ).dimensions(leftX, yLeft, buttonWidth, BUTTON_HEIGHT).build()).active = false;
-        yLeft += BUTTON_HEIGHT + 2;
-        this.addDrawableChild(ButtonWidget.builder(
-                Text.literal("Toggle Tool Swap: " + (ToolSwapFeature.toolSwapEnabled ? "ON" : "OFF")),
-                btn -> { ToolSwapFeature.toolSwapEnabled = !ToolSwapFeature.toolSwapEnabled; this.init(); }
-        ).dimensions(leftX + indent, yLeft, buttonWidth - indent, BUTTON_HEIGHT).build());
-        yLeft += BUTTON_HEIGHT + 2;
-        this.addDrawableChild(ButtonWidget.builder(
-                Text.literal("Auto Swap: " + (ToolSwapFeature.autoSwapOnMine ? "ON" : "OFF")),
-                btn -> { ToolSwapFeature.autoSwapOnMine = !ToolSwapFeature.autoSwapOnMine; this.init(); }
-        ).dimensions(leftX + indent, yLeft, buttonWidth - indent, BUTTON_HEIGHT).build());
-        yLeft += BUTTON_HEIGHT + 2;
-        this.addDrawableChild(ButtonWidget.builder(
-                Text.literal("Tool Settings"),
-                btn -> MinecraftClient.getInstance().setScreen(new ToolSwapConfigScreen(this))
-        ).dimensions(leftX + indent, yLeft, buttonWidth - indent, BUTTON_HEIGHT).build());
-        yLeft += BUTTON_HEIGHT + 2;
-        this.addDrawableChild(ButtonWidget.builder(
-                Text.literal("Manual Swap: R"),
                 btn -> {}
         ).dimensions(leftX + indent, yLeft, buttonWidth - indent, BUTTON_HEIGHT).build()).active = false;
         yLeft += BUTTON_HEIGHT + sectionPad;
