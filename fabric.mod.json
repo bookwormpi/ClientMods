@@ -1,15 +1,14 @@
 {
   "schemaVersion": 1,
-  "id": "example-mod",
-  "version": "1.0.0",
-  "name": "Example Mod",
-  "description": "This is an example mod.",
+  "id": "clientsidetesting",
+  "version": "1.1.9",
+  "name": "Clientside Testing",
+  "description": "A mod demonstrating some client-side only features.",
   "authors": [
-    "Author Name"
+    "Logan Schaaf"
   ],
   "contact": {
-    "homepage": "https://example.com",
-    "sources": "https://github.com/example/example-mod"
+    "sources": "https://github.com/bookwormpi/ClientMods"
   },
   "license": "MIT",
   "environment": "*",
