@@ -2,6 +2,7 @@ package org.bookwormpi.clientsidetesting.client;
 
 import net.minecraft.client.render.*;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
@@ -55,6 +56,40 @@ public class BlockSearchFeature {
                 scanning.set(true);
             }
             return net.minecraft.util.ActionResult.PASS;
+        });
+        HudRenderCallback.EVENT.register((drawContext, tickDelta) -> {
+            if (!enabled || blockToSearch == null || foundBlocks.isEmpty()) return;
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client.player == null) return;
+            var textRenderer = client.textRenderer;
+            var stack = new net.minecraft.item.ItemStack(blockToSearch);
+            BlockPos closest = foundBlocks.get(0);
+            double minDist = client.player.getPos().squaredDistanceTo(closest.getX() + 0.5, closest.getY() + 0.5, closest.getZ() + 0.5);
+            for (BlockPos pos : foundBlocks) {
+                double dist = client.player.getPos().squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = pos;
+                }
+            }
+            int x = client.getWindow().getScaledWidth();
+            int y = 4;
+            int iconSize = 16;
+            int iconX = x - iconSize - 8;
+            int iconY = y;
+            // Draw the block icon in the HUD using DrawContext
+            drawContext.drawItem(stack, iconX, iconY);
+            String blockName = stack.getName().getString();
+            int nameWidth = textRenderer.getWidth(blockName);
+            int nameX = iconX - nameWidth - 6;
+            int nameY = iconY + 4;
+            drawContext.drawTextWithShadow(textRenderer, blockName, nameX, nameY, 0xFFFFFF);
+            // Render colored coordinates (x=red, y=green, z=blue)
+            String coords = String.format("[§c%d§r,§a%d§r,§b%d§r]", closest.getX(), closest.getY(), closest.getZ());
+            int coordsWidth = textRenderer.getWidth(coords.replaceAll("§.", ""));
+            int coordsX = nameX - coordsWidth - 8;
+            int coordsY = nameY;
+            drawContext.drawTextWithShadow(textRenderer, coords, coordsX, coordsY, 0xFFFFFF);
         });
     }
 
