@@ -59,16 +59,13 @@ public class BlockSearchFeature {
     }
 
     public static void requestScan(MinecraftClient client, ChunkPos playerChunk) {
-        System.out.println("[BlockSearchFeature] requestScan called. enabled=" + enabled + ", blockToSearch=" + blockToSearch + ", playerChunk=" + playerChunk);
         if (scanning.get()) {
-            System.out.println("[BlockSearchFeature] Scan already in progress, skipping.");
             return; // Prevent concurrent scans
         }
         // Double-check again right before starting async scan
         scanning.set(true);
         CompletableFuture.runAsync(() -> {
             if (scanning.get() && Thread.currentThread().isInterrupted()) {
-                System.out.println("[BlockSearchFeature] Scan was interrupted before start.");
                 scanning.set(false);
                 return;
             }
@@ -77,14 +74,11 @@ public class BlockSearchFeature {
                 foundBlocks.clear();
                 foundBlocks.addAll(results);
                 scanning.set(false);
-                ClientsidetestingClient.LOGGER.info("BlockSearchFeature: Found " + foundBlocks.size() + " blocks");
-                System.out.println("[BlockSearchFeature] Scan complete. Found " + foundBlocks.size() + " blocks.");
             });
         });
     }
 
     private static List<BlockPos> scanBlocks(MinecraftClient client, ChunkPos playerChunk) {
-        System.out.println("[BlockSearchFeature] scanBlocks called for chunk " + playerChunk + ", blockToSearch=" + blockToSearch);
         List<BlockPos> results = new ArrayList<>();
         int distance = scanDistance > 0 ? Math.min(scanDistance, MAX_SCAN_DISTANCE) : (client.options != null ? Math.min(client.options.getViewDistance().getValue(), MAX_SCAN_DISTANCE) : 8);
         BlockPos playerPos = client.player.getBlockPos();
@@ -105,7 +99,6 @@ public class BlockSearchFeature {
             ChunkPos chunkPos = new ChunkPos(playerChunk.x + dx, playerChunk.z + dz);
             boolean loaded = client.world.getChunkManager().isChunkLoaded(chunkPos.x, chunkPos.z);
             if (!loaded) {
-                System.out.println("[BlockSearchFeature] Skipping unloaded chunk: " + chunkPos);
                 continue;
             }
             var chunk = client.world.getChunk(chunkPos.x, chunkPos.z);
@@ -136,13 +129,11 @@ public class BlockSearchFeature {
             candidates.sort((a, b) -> Double.compare(a.getSquaredDistance(playerPos), b.getSquaredDistance(playerPos)));
             for (BlockPos found : candidates) {
                 results.add(found);
-                System.out.println("[BlockSearchFeature] Found block at " + found);
                 if (results.size() >= maxRenderedBlocks) {
                     break outer;
                 }
             }
         }
-        System.out.println("[BlockSearchFeature] scanBlocks finished. Total found: " + results.size());
         return results;
     }
 

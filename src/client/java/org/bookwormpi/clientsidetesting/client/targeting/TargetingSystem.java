@@ -134,20 +134,8 @@ public class TargetingSystem {
         int maxTries = 7;
         Vec3d bestPoint = null;
         for (int attempt = 0; attempt < maxTries; attempt++) {
-            // First try: center, then random points in hitbox
             Vec3d targetPoint;
-            if (attempt == 0) {
-                targetPoint = hitbox.getCenter();
-            } else {
-                double rx = hitbox.minX + Math.random() * (hitbox.maxX - hitbox.minX);
-                double ry = hitbox.minY + Math.random() * (hitbox.maxY - hitbox.minY);
-                double rz = hitbox.minZ + Math.random() * (hitbox.maxZ - hitbox.minZ);
-                targetPoint = new Vec3d(rx, ry, rz);
-            }
-            // Check line of sight from shooter's eye to this point
-            if (!hasLineOfSight(client, shooterPos, targetPoint)) continue;
             Vec3d targetVelocity = new Vec3d(target.getVelocity().x, target.getVelocity().y, target.getVelocity().z);
-            // Base projectile speed
             float projectileSpeed = 1.0f;
             float drawPercentage = 1.0f;
             if (weapon.getItem() instanceof BowItem && client.player.isUsingItem()) {
@@ -162,9 +150,25 @@ public class TargetingSystem {
                 projectileSpeed = 3.15f * speedMultiplier;
             }
             double gravity = 0.05;
-            double timeToHit = solveProjectileTimeWithShooterVelocity(
-                shooterPos, shooterVel, targetPoint, targetVelocity, projectileSpeed, gravity
-            );
+            double timeToHit;
+            if (attempt == 0) {
+                // Predict target's future position for the first attempt
+                timeToHit = solveProjectileTimeWithShooterVelocity(
+                    shooterPos, shooterVel, hitbox.getCenter(), targetVelocity, projectileSpeed, gravity
+                );
+                targetPoint = hitbox.getCenter().add(targetVelocity.multiply(timeToHit));
+            } else {
+                double rx = hitbox.minX + Math.random() * (hitbox.maxX - hitbox.minX);
+                double ry = hitbox.minY + Math.random() * (hitbox.maxY - hitbox.minY);
+                double rz = hitbox.minZ + Math.random() * (hitbox.maxZ - hitbox.minZ);
+                targetPoint = new Vec3d(rx, ry, rz);
+                // For random points, recalculate timeToHit for that point
+                timeToHit = solveProjectileTimeWithShooterVelocity(
+                    shooterPos, shooterVel, targetPoint, targetVelocity, projectileSpeed, gravity
+                );
+            }
+            // Check line of sight from shooter's eye to this point
+            if (!hasLineOfSight(client, shooterPos, targetPoint)) continue;
             Vec3d predictedTarget = targetPoint.add(targetVelocity.multiply(timeToHit));
             Vec3d delta = predictedTarget.subtract(shooterPos);
             Vec3d effectiveDelta = delta.subtract(shooterVel.multiply(timeToHit));
@@ -194,16 +198,20 @@ public class TargetingSystem {
 
     /**
      * Checks if there is a direct line of sight (no blocks) from start to end.
+     * Uses the player's actual eye position for start, and the exact target point for end.
      */
     private boolean hasLineOfSight(MinecraftClient client, Vec3d start, Vec3d end) {
         if (client.world == null) return false;
+        // Use the player's actual eye position for start, and the exact target point for end
         Vec3d dir = end.subtract(start);
         double len = dir.length();
         if (len < 0.1) return true;
         Vec3d norm = dir.normalize();
         for (double d = 0; d < len; d += 0.25) {
             Vec3d pos = start.add(norm.multiply(d));
-            net.minecraft.util.math.BlockPos blockPos = new net.minecraft.util.math.BlockPos((int)Math.floor(pos.x), (int)Math.floor(pos.y), (int)Math.floor(pos.z));
+            net.minecraft.util.math.BlockPos blockPos = new net.minecraft.util.math.BlockPos(
+                (int)Math.floor(pos.x), (int)Math.floor(pos.y), (int)Math.floor(pos.z)
+            );
             if (!client.world.getBlockState(blockPos).isAir()) {
                 return false;
             }
