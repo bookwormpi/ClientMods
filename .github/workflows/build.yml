@@ -1,15 +1,11 @@
-name: Build Fabric Mod
+name: Build and Release Fabric Mod
 
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-  release:
-    types: [published]
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,14 +24,44 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build
 
-      - name: Upload mod jar artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: mod-jar
-          path: build/libs/*.jar
+      - name: Get mod version
+        id: get_version
+        run: |
+          version=$(grep '^mod_version=' gradle.properties | cut -d'=' -f2)
+          echo "mod_version=$version" >> $GITHUB_OUTPUT
 
-      - name: Upload to GitHub Release
-        if: github.event_name == 'release'
+      - name: Check if release exists
+        id: check_release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = process.env.VERSION;
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            const found = releases.find(r => r.tag_name === `v${version}`);
+            if (found) {
+              core.setOutput('exists', 'true');
+              core.setOutput('release_id', found.id);
+              core.setOutput('tag', found.tag_name);
+            } else {
+              core.setOutput('exists', 'false');
+            }
+        env:
+          VERSION: ${{ steps.get_version.outputs.mod_version }}
+
+      - name: Create release if needed
+        if: steps.check_release.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.get_version.outputs.mod_version }}
+          name: v${{ steps.get_version.outputs.mod_version }}
+          draft: false
+          prerelease: false
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.get_version.outputs.mod_version }}
           files: build/libs/*.jar
