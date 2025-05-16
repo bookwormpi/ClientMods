@@ -73,21 +73,33 @@ public class BlockSearchFeature {
                 }
             }
             int x = client.getWindow().getScaledWidth();
-            int y = 4;
+            // Calculate offset for status effect icons
+            int effectCount = client.player.getStatusEffects().size();
+            int effectIconHeight = 18;
+            int effectIconGap = 1;
+            int y;
+            if (effectCount > 0 && effectCount <= 5) {
+                y = 4 + effectIconHeight + effectIconGap;
+            } else if (effectCount > 5) {
+                y = 4 + effectCount * (effectIconHeight + effectIconGap);
+            } else {
+                y = 4;
+            }
             int iconSize = 16;
-            int iconX = x - iconSize - 8;
+            String blockName = stack.getName().getString();
+            int nameWidth = textRenderer.getWidth(blockName);
+            // Place name right-aligned with 8px margin, icon to the left of name
+            int nameX = x - nameWidth - 8;
+            int nameY = y + 4;
+            int iconX = nameX - iconSize - 6;
             int iconY = y;
             // Draw the block icon in the HUD using DrawContext
             drawContext.drawItem(stack, iconX, iconY);
-            String blockName = stack.getName().getString();
-            int nameWidth = textRenderer.getWidth(blockName);
-            int nameX = iconX - nameWidth - 6;
-            int nameY = iconY + 4;
             drawContext.drawTextWithShadow(textRenderer, blockName, nameX, nameY, 0xFFFFFF);
             // Render colored coordinates (x=red, y=green, z=blue)
             String coords = String.format("[§c%d§r,§a%d§r,§b%d§r]", closest.getX(), closest.getY(), closest.getZ());
             int coordsWidth = textRenderer.getWidth(coords.replaceAll("§.", ""));
-            int coordsX = nameX - coordsWidth - 8;
+            int coordsX = iconX - coordsWidth - 8;
             int coordsY = nameY;
             drawContext.drawTextWithShadow(textRenderer, coords, coordsX, coordsY, 0xFFFFFF);
         });
