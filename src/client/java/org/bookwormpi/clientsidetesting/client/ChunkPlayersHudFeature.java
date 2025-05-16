@@ -16,7 +16,6 @@ public class ChunkPlayersHudFeature {
         // If not, keep the deprecated HudRenderCallback for now, but add a comment for future migration.
         HudRenderCallback.EVENT.register((context, tickDelta) -> {
             if (!ClientsidetestingClient.showChunkPlayers) return;
-
             MinecraftClient client = MinecraftClient.getInstance();
             if (client.world == null || client.player == null) return;
 
