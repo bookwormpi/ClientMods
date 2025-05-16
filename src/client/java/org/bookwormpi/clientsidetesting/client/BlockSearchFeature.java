@@ -176,11 +176,6 @@ public class BlockSearchFeature {
         return results;
     }
 
-    // Overload for old calls
-    private static List<BlockPos> scanBlocks(MinecraftClient client, ChunkPos playerChunk) {
-        return scanBlocks(client, playerChunk, blockToSearch);
-    }
-
     private static void onWorldRender(WorldRenderContext context) {
         if (!enabled || blockToSearch == null) return;
         MinecraftClient client = MinecraftClient.getInstance();
