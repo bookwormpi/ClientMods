@@ -76,6 +76,18 @@ jobs:
               // Tag might not exist, ignore error
             }
 
+      - name: Wait for tag deletion
+        if: steps.check_release.outputs.exists == 'true'
+        run: |
+          for i in {1..10}; do
+            if ! git ls-remote --tags origin | grep -q "refs/tags/v${{ steps.get_version.outputs.mod_version }}"; then
+              echo "Tag deleted!"
+              break
+            fi
+            echo "Tag still exists, waiting... ($i)"
+            sleep 2
+          done
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
