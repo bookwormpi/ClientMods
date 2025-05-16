@@ -7,7 +7,6 @@ on:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -43,61 +42,18 @@ jobs:
             const found = releases.find(r => r.tag_name === `v${version}`);
             if (found) {
               core.setOutput('exists', 'true');
-              core.setOutput('release_id', found.id);
-              core.setOutput('tag', found.tag_name);
             } else {
               core.setOutput('exists', 'false');
             }
         env:
           VERSION: ${{ steps.get_version.outputs.mod_version }}
 
-      - name: Delete previous release and tag if exists
-        if: steps.check_release.outputs.exists == 'true'
-        uses: actions/github-script@v7
-        env:
-          RELEASE_ID: ${{ steps.check_release.outputs.release_id }}
-          TAG: ${{ steps.check_release.outputs.tag }}
-        with:
-          script: |
-            // Delete the release
-            await github.rest.repos.deleteRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: process.env.RELEASE_ID
-            });
-            // Delete the tag
-            try {
-              await github.rest.git.deleteRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: `tags/${process.env.TAG}`
-              });
-            } catch (e) {
-              // Tag might not exist, ignore error
-            }
-
-      - name: Wait for tag deletion
-        if: steps.check_release.outputs.exists == 'true'
-        run: |
-          for i in {1..10}; do
-            if ! git ls-remote --tags origin | grep -q "refs/tags/v${{ steps.get_version.outputs.mod_version }}"; then
-              echo "Tag deleted!"
-              break
-            fi
-            echo "Tag still exists, waiting... ($i)"
-            sleep 2
-          done
-
-      - name: Create release
+      - name: Create release and upload jar
+        if: steps.check_release.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.get_version.outputs.mod_version }}
           name: v${{ steps.get_version.outputs.mod_version }}
+          files: build/libs/ClientSideTesting-*.jar
           draft: false
           prerelease: false
-
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.get_version.outputs.mod_version }}
-          files: build/libs/*.jar
