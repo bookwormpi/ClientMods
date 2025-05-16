@@ -54,22 +54,23 @@ jobs:
       - name: Delete previous release and tag if exists
         if: steps.check_release.outputs.exists == 'true'
         uses: actions/github-script@v7
+        env:
+          RELEASE_ID: ${{ steps.check_release.outputs.release_id }}
+          TAG: ${{ steps.check_release.outputs.tag }}
         with:
           script: |
-            const release_id = ${{ steps.check_release.outputs.release_id }};
-            const tag = ${{ steps.check_release.outputs.tag }};
             // Delete the release
             await github.rest.repos.deleteRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              release_id: release_id
+              release_id: process.env.RELEASE_ID
             });
             // Delete the tag
             try {
               await github.rest.git.deleteRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                ref: `tags/${tag}`
+                ref: `tags/${process.env.TAG}`
               });
             } catch (e) {
               // Tag might not exist, ignore error
