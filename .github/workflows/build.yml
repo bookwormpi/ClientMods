@@ -51,8 +51,31 @@ jobs:
         env:
           VERSION: ${{ steps.get_version.outputs.mod_version }}
 
-      - name: Create release if needed
-        if: steps.check_release.outputs.exists == 'false'
+      - name: Delete previous release and tag if exists
+        if: steps.check_release.outputs.exists == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const release_id = ${{ steps.check_release.outputs.release_id }};
+            const tag = ${{ steps.check_release.outputs.tag }};
+            // Delete the release
+            await github.rest.repos.deleteRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release_id
+            });
+            // Delete the tag
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${tag}`
+              });
+            } catch (e) {
+              // Tag might not exist, ignore error
+            }
+
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.get_version.outputs.mod_version }}
