@@ -93,18 +93,17 @@ public class BlockSearchFeature {
         });
     }
 
-    public static void requestScan(MinecraftClient client, ChunkPos playerChunk) {
+    public static void requestScan(MinecraftClient client, ChunkPos playerChunk, Block blockType) {
         if (scanning.get()) {
             return; // Prevent concurrent scans
         }
-        // Double-check again right before starting async scan
         scanning.set(true);
         CompletableFuture.runAsync(() -> {
             if (scanning.get() && Thread.currentThread().isInterrupted()) {
                 scanning.set(false);
                 return;
             }
-            List<BlockPos> results = scanBlocks(client, playerChunk);
+            List<BlockPos> results = scanBlocks(client, playerChunk, blockType);
             client.execute(() -> {
                 foundBlocks.clear();
                 foundBlocks.addAll(results);
@@ -113,7 +112,12 @@ public class BlockSearchFeature {
         });
     }
 
-    private static List<BlockPos> scanBlocks(MinecraftClient client, ChunkPos playerChunk) {
+    // Overload for old calls
+    public static void requestScan(MinecraftClient client, ChunkPos playerChunk) {
+        requestScan(client, playerChunk, blockToSearch);
+    }
+
+    private static List<BlockPos> scanBlocks(MinecraftClient client, ChunkPos playerChunk, Block blockType) {
         List<BlockPos> results = new ArrayList<>();
         int distance = scanDistance > 0 ? Math.min(scanDistance, MAX_SCAN_DISTANCE) : (client.options != null ? Math.min(client.options.getViewDistance().getValue(), MAX_SCAN_DISTANCE) : 8);
         BlockPos playerPos = client.player.getBlockPos();
@@ -148,7 +152,7 @@ public class BlockSearchFeature {
                 for (int x = 0; x < 16; x++) {
                     for (int z = 0; z < 16; z++) {
                         for (int y = 0; y < 16; y++) {
-                            if (section.getBlockState(x, y, z).isOf(blockToSearch)) {
+                            if (section.getBlockState(x, y, z).isOf(blockType)) {
                                 BlockPos found = new BlockPos(
                                     chunkPos.getStartX() + x,
                                     yOffset + y,
@@ -170,6 +174,11 @@ public class BlockSearchFeature {
             }
         }
         return results;
+    }
+
+    // Overload for old calls
+    private static List<BlockPos> scanBlocks(MinecraftClient client, ChunkPos playerChunk) {
+        return scanBlocks(client, playerChunk, blockToSearch);
     }
 
     private static void onWorldRender(WorldRenderContext context) {
@@ -264,8 +273,13 @@ public class BlockSearchFeature {
         blockToSearch = block;
         enabled = true;
         lastPlayerChunk = null;
+        // Clear previous results so old blocks are not rendered
+        foundBlocks.clear();
+        // Force scanning flag to false so a new scan always starts
+        scanning.set(false);
+        // Immediately trigger a scan for the new block type
         if (MinecraftClient.getInstance().player != null) {
-            requestScan(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos());
+            requestScan(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos(), block);
         }
     }
 
