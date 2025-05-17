@@ -68,8 +68,9 @@ A modern Fabric client-side utility mod for Minecraft, focused on block search, 
 
 - **Mod Author:** [bookwormpi](https://github.com/bookwormpi)
 - **README & Documentation Style:**
-  - Inspired by [Refined Storage 2](https://github.com/refinedmods/refinedstorage2) by [raoulvdberge](https://github.com/raoulvdberge) and contributors.
-  - Thanks for setting a high bar for mod documentation and user experience!
+  - Inspired by [Refined Storage 2](https://github.com/refinedmods/refinedstorage2)
+- **AI Assistance:**
+  - Most code and documentation generated with help from [GitHub Copilot](https://github.com/features/copilot)
 
 ---
 
