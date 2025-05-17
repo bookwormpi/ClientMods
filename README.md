@@ -1,6 +1,6 @@
 # ClientSideTesting
 
-[![Build Status](https://github.com/bookwormpi/ClientSideTesting/actions/workflows/build.yml/badge.svg)](https://github.com/bookwormpi/ClientSideTesting/actions/workflows/build.yml)
+[![Build Status](https://github.com/bookwormpi/ClientSideTesting/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/bookwormpi/ClientSideTesting/actions/workflows/build.yml)
 
 A modern Fabric client-side utility mod for Minecraft, focused on block search, HUD overlays, and chunk player display. Inspired by the clean design and documentation style of [Refined Storage 2](https://github.com/refinedmods/refinedstorage2).
 
