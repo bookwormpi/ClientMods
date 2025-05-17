@@ -1,8 +1,8 @@
 # ClientSideTesting
 
-[![Build Status](https://github.com/bookwormpi/ClientSideTesting/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/bookwormpi/ClientSideTesting/actions/workflows/build.yml)
+[![Build Status](https://github.com/bookwormpi/ClientSideTesting/actions/workflows/build.yml/badge.svg)](https://github.com/bookwormpi/ClientSideTesting/actions/workflows/build.yml)
 
-A modern Fabric client-side utility mod for Minecraft, focused on block search, HUD overlays, and chunk player display. Inspired by the clean design and documentation style of [Refined Storage 2](https://github.com/refinedmods/refinedstorage2).
+A Fabric client-side utility mod for Minecraft, focused on block search, HUD overlays, and chunk player display.
 
 ---
 
@@ -49,7 +49,7 @@ A modern Fabric client-side utility mod for Minecraft, focused on block search, 
 
 - **Block to Search:** Changeable via in-game config or keybind (default: Diamond Block).
 - **Search Distance:** How far (in chunks) to search for blocks. Defaults to your render distance (max 16).
-- **Max Rendered Blocks:** Limits the number of highlighted blocks for performance.
+- **Max Rendered Blocks:** Limits the number of highlighted blocks for performance reasons.
 - **Search Interval:** How often to rescan (in ticks).
 
 ---
@@ -59,8 +59,6 @@ A modern Fabric client-side utility mod for Minecraft, focused on block search, 
 - **Builds:**
   - Automated with GitHub Actions. Each push/PR builds a `.jar` and uploads it as an artifact.
   - Releases are created automatically for new versions.
-- **Contributions:**
-  - Issues and PRs are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
