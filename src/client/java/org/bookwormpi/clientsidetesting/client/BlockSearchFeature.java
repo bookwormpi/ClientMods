@@ -293,19 +293,39 @@ public class BlockSearchFeature {
     public static void setScanDistance(int distance) {
         scanDistance = distance;
         if (enabled && MinecraftClient.getInstance().player != null) {
+            foundBlocks.clear(); // Clear previous results
+            scanning.set(false); // Ensure scan can run
             requestScan(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos());
+            if (MinecraftClient.getInstance().world != null) {
+                MinecraftClient.getInstance().worldRenderer.reload();
+            }
         }
     }
 
     public static void setMaxRenderedBlocks(int maxBlocks) {
         maxRenderedBlocks = maxBlocks;
-        // No rescan needed, just affects rendering
+        foundBlocks.clear(); // Clear previous results
+        scanning.set(false); // Ensure scan can run
+        if (enabled && MinecraftClient.getInstance().player != null) {
+            requestScan(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos());
+            if (MinecraftClient.getInstance().world != null) {
+                MinecraftClient.getInstance().worldRenderer.reload();
+            }
+        }
     }
 
     public static void setEnabled(boolean value) {
         enabled = value;
+        foundBlocks.clear(); // Clear previous results
+        scanning.set(false); // Ensure scan can run
         if (enabled && MinecraftClient.getInstance().player != null) {
             requestScan(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos());
+            if (MinecraftClient.getInstance().world != null) {
+                MinecraftClient.getInstance().worldRenderer.reload();
+            }
+        } else if (MinecraftClient.getInstance().world != null) {
+            // If disabling, force a rerender to clear highlights
+            MinecraftClient.getInstance().worldRenderer.reload();
         }
     }
 
@@ -327,6 +347,14 @@ public class BlockSearchFeature {
 
     public static void setScanIntervalTicks(int ticks) {
         scanIntervalTicks = ticks;
+        foundBlocks.clear(); // Clear previous results
+        scanning.set(false); // Ensure scan can run
+        if (enabled && MinecraftClient.getInstance().player != null) {
+            requestScan(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos());
+            if (MinecraftClient.getInstance().world != null) {
+                MinecraftClient.getInstance().worldRenderer.reload();
+            }
+        }
     }
 
     public static int getScanIntervalTicks() {
