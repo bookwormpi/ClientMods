@@ -1,6 +1,6 @@
 # ClientSideTesting
 
-[![Build Status](https://github.com/bookwormpi/ClientSideTesting/actions/workflows/build.yml/badge.svg)](https://github.com/bookwormpi/ClientSideTesting/actions/workflows/build.yml)
+[![Build and Release Fabric Mod](https://github.com/bookwormpi/ClientMods/actions/workflows/build.yml/badge.svg)](https://github.com/bookwormpi/ClientMods/actions/workflows/build.yml)
 
 A Fabric client-side utility mod for Minecraft, focused on block search, HUD overlays, and chunk player display.
 
