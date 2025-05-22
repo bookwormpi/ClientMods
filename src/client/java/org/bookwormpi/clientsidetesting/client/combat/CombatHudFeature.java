@@ -15,8 +15,10 @@ import net.minecraft.item.CrossbowItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import org.bookwormpi.clientsidetesting.client.ClientsidetestingClient;
+import org.bookwormpi.clientsidetesting.client.targeting.TargetingSystem;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,7 +27,6 @@ import java.util.List;
 public class CombatHudFeature {
     // Targeting system variables
     private static final double TARGET_RANGE = 64.0;
-    private static LivingEntity currentTarget;
     private static long lastTargetSwitchTime;
     private static final long TARGET_SWITCH_COOLDOWN = 2000; // 2 seconds in milliseconds
     
@@ -38,6 +39,9 @@ public class CombatHudFeature {
     private static final float DISTANCE_SCALE_FACTOR = 0.08f; // Controls how quickly the size scales with distance
     private static final float MIN_SCALE = 0.3f; // Minimum scale to prevent tiny indicators
     private static final float MAX_SCALE = 2.0f; // Maximum scale to prevent huge indicators
+
+    // Targeting system instance
+    private static final TargetingSystem targetingSystem = new TargetingSystem();
 
     public static void register() {
         WorldRenderEvents.AFTER_ENTITIES.register(CombatHudFeature::onWorldRender);
@@ -69,8 +73,9 @@ public class CombatHudFeature {
         renderEntitySquares(matrices, vertexConsumers, cameraPos);
         
         // Draw aim prediction circle if we have a valid target
-        if (isTargetValid()) {
+        if (targetingSystem.isTargetValid()) {
             renderAimAssistCircle(matrices, vertexConsumers, cameraPos, heldItem);
+            renderPredictedPath(matrices, vertexConsumers, cameraPos, heldItem);
         }
         
         vertexConsumers.draw(); // Important: draw after all rendering is done
@@ -92,14 +97,13 @@ public class CombatHudFeature {
         // Check for entity hit with raycast
         Entity hitEntity = getPlayerAttackTarget();
         if (hitEntity instanceof LivingEntity && 
-            !hitEntity.equals(currentTarget) && hitEntity.isAlive()) {
+            !hitEntity.equals(targetingSystem.getCurrentTarget()) && hitEntity.isAlive()) {
             // Player has hit a different living entity - switch target to it
-            currentTarget = (LivingEntity) hitEntity;
-            lastTargetSwitchTime = System.currentTimeMillis();
+            // Use targetingSystem logic if needed
         }
         
         // Handle aim lock if enabled
-        if (aimLockEnabled && isTargetValid()) {
+        if (aimLockEnabled && targetingSystem.isTargetValid()) {
             updatePlayerViewToTarget(client, heldItem);
         }
     }
@@ -145,14 +149,14 @@ public class CombatHudFeature {
      */
     private static void renderEntitySquares(MatrixStack matrices, VertexConsumerProvider vertexConsumers, 
                                                   Vec3d cameraPos) {
-        List<LivingEntity> entities = getAllLivingEntitiesInRange();
+        List<LivingEntity> entities = targetingSystem.getEligibleMobsInRange();
         for (LivingEntity entity : entities) {
             Vec3d entityPos = entity.getPos();
             double x = entityPos.x - cameraPos.x;
             double y = entityPos.y + entity.getHeight() + 0.5 - cameraPos.y;
             double z = entityPos.z - cameraPos.z;
             
-            boolean isTarget = entity.equals(currentTarget);
+            boolean isTarget = entity.equals(targetingSystem.getCurrentTarget());
             float r = isTarget ? 1.0f : 0.0f;
             float g = isTarget ? 0.0f : 1.0f;
             float b = 0.0f;
@@ -226,28 +230,22 @@ public class CombatHudFeature {
      */
     private static void renderAimAssistCircle(MatrixStack matrices, VertexConsumerProvider vertexConsumers,
                                              Vec3d cameraPos, ItemStack weapon) {
-        // Calculate where to aim based on target velocity, bow power, etc.
-        Vec3d aimPos = calculateAimPosition(currentTarget, weapon);
+        // Use ideal aim prediction for moving targets
+        List<Vec3d> dummyPath = new ArrayList<>();
+        Vec3d aimPos = targetingSystem.calculateIdealAimPosition(targetingSystem.getCurrentTarget(), weapon, dummyPath);
         if (aimPos == null) return;
-        
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) return;
         double x = aimPos.x - cameraPos.x;
         double y = aimPos.y - cameraPos.y;
         double z = aimPos.z - cameraPos.z;
-        
-        // Calculate distance to aim point
         double distance = Math.sqrt(x*x + y*y + z*z);
-        
-        // Scale radius based on distance
         float scale = calculateDistanceScale(distance);
         float circleRadius = BASE_CIRCLE_SIZE * scale;
-        
-        // Use different color when aim lock is enabled
         float red = aimLockEnabled ? 1.0f : 0.0f;
         float green = 1.0f;
         float blue = aimLockEnabled ? 1.0f : 0.0f;
         float alpha = 0.8f;
-        
-        // Draw a circle at the aim position
         drawCircle(matrices, vertexConsumers, x, y, z, circleRadius, red, green, blue, alpha);
     }
     
@@ -285,6 +283,33 @@ public class CombatHudFeature {
                 .normal(0.0f, 1.0f, 0.0f);
         }
         
+        matrices.pop();
+    }
+    
+    /**
+     * Renders the predicted projectile path in the world using line segments.
+     */
+    private static void renderPredictedPath(MatrixStack matrices, VertexConsumerProvider vertexConsumers, Vec3d cameraPos, ItemStack weapon) {
+        List<Vec3d> path = targetingSystem.getPredictedPath(targetingSystem.getCurrentTarget(), weapon);
+        if (path.size() < 2) return;
+        VertexConsumer lines = vertexConsumers.getBuffer(RenderLayer.getLines());
+        matrices.push();
+        for (int i = 1; i < path.size(); i++) {
+            Vec3d p0 = path.get(i - 1);
+            Vec3d p1 = path.get(i);
+            double x0 = p0.x - cameraPos.x;
+            double y0 = p0.y - cameraPos.y;
+            double z0 = p0.z - cameraPos.z;
+            double x1 = p1.x - cameraPos.x;
+            double y1 = p1.y - cameraPos.y;
+            double z1 = p1.z - cameraPos.z;
+            lines.vertex(matrices.peek().getPositionMatrix(), (float)x0, (float)y0, (float)z0)
+                .color(1.0f, 1.0f, 0.0f, 0.8f)
+                .normal(0.0f, 1.0f, 0.0f);
+            lines.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z1)
+                .color(1.0f, 1.0f, 0.0f, 0.8f)
+                .normal(0.0f, 1.0f, 0.0f);
+        }
         matrices.pop();
     }
     
@@ -350,35 +375,53 @@ public class CombatHudFeature {
     }
     
     /**
-     * Handles the target cycle key press
+     * Handles the target cycle key press (now selects the mob closest to the player's crosshair within 5 degrees, not including bats)
      */
     public static void handleTargetCycleKeyPress() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.world == null) return;
-        
-        long currentTime = System.currentTimeMillis();
-        boolean cooldownExpired = (currentTime - lastTargetSwitchTime) > TARGET_SWITCH_COOLDOWN;
-        
-        // Check if player is holding a bow or crossbow
+
+        // Only allow selection if holding a bow or crossbow
         ItemStack heldItem = client.player.getMainHandStack();
         if (!(heldItem.getItem() instanceof BowItem || heldItem.getItem() instanceof CrossbowItem)) {
-            currentTarget = null;
             return;
         }
-        
-        // If cooldown has expired, check if player is looking at a mob
-        if (cooldownExpired) {
-            LivingEntity lookTarget = getLookTargetEntity();
-            if (lookTarget != null) {
-                currentTarget = lookTarget;
-                lastTargetSwitchTime = currentTime;
-                return;
+
+        // Get all eligible mobs (excluding bats)
+        List<LivingEntity> mobs = targetingSystem.getEligibleMobsInRange();
+        if (mobs.isEmpty()) return;
+
+        // Player's orientation
+        float playerYaw = client.player.getYaw();
+        float playerPitch = client.player.getPitch();
+        LivingEntity best = null;
+        double bestAngle = 6.0; // Only consider mobs within 5 degrees, so start with 6
+        for (LivingEntity mob : mobs) {
+            // Vector from player eye to mob center
+            Vec3d playerEye = client.player.getEyePos();
+            Vec3d mobCenter = mob.getPos().add(0, mob.getHeight() * 0.5, 0);
+            Vec3d toMob = mobCenter.subtract(playerEye).normalize();
+            // Convert to yaw/pitch
+            double dx = toMob.x;
+            double dy = toMob.y;
+            double dz = toMob.z;
+            double horizDist = Math.sqrt(dx*dx + dz*dz);
+            float mobYaw = (float)Math.toDegrees(Math.atan2(dz, dx)) - 90.0F;
+            float mobPitch = (float)-Math.toDegrees(Math.atan2(dy, horizDist));
+            // Angle difference
+            float yawDiff = Math.abs(MathHelper.wrapDegrees(mobYaw - playerYaw));
+            float pitchDiff = Math.abs(mobPitch - playerPitch);
+            if (yawDiff <= 5.0f && pitchDiff <= 5.0f) {
+                double totalAngle = Math.hypot(yawDiff, pitchDiff);
+                if (totalAngle < bestAngle) {
+                    best = mob;
+                    bestAngle = totalAngle;
+                }
             }
         }
-        
-        // Otherwise cycle to next target
-        cycleToNextTarget();
-        lastTargetSwitchTime = currentTime;
+        if (best != null) {
+            targetingSystem.setCurrentTarget(best);
+        }
     }
     
     /**
@@ -387,18 +430,18 @@ public class CombatHudFeature {
     private static void cycleToNextTarget() {
         List<LivingEntity> entities = getAllLivingEntitiesInRange();
         if (entities.isEmpty()) {
-            currentTarget = null;
             return;
         }
         
+        LivingEntity currentTarget = targetingSystem.getCurrentTarget();
         if (currentTarget == null || !entities.contains(currentTarget)) {
             // If no current target or it's not in range anymore, choose the closest
-            currentTarget = entities.get(0);
+            targetingSystem.setCurrentTarget(entities.get(0));
         } else {
             // Find current target's index and move to next
             int currentIndex = entities.indexOf(currentTarget);
             int nextIndex = (currentIndex + 1) % entities.size();
-            currentTarget = entities.get(nextIndex);
+            targetingSystem.setCurrentTarget(entities.get(nextIndex));
         }
     }
     
@@ -434,268 +477,6 @@ public class CombatHudFeature {
     }
     
     /**
-     * Calculate where to aim to hit the target
-     */
-    private static Vec3d calculateAimPosition(LivingEntity target, ItemStack weapon) {
-        if (target == null) return null;
-        
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null) return null;
-        
-        // Get target position (center of hitbox)
-        Vec3d targetPos = target.getPos().add(0, target.getHeight() / 2, 0);
-        Vec3d targetVelocity = new Vec3d(target.getVelocity().x, target.getVelocity().y, target.getVelocity().z);
-        
-        // Get player position and velocity
-        Vec3d playerPos = client.player.getEyePos();
-        Vec3d playerVelocity = client.player.getVelocity();
-        
-        // Base projectile speed
-        float projectileSpeed = 1.0f;
-        
-        // Calculate draw percentage for bow
-        float drawPercentage = 1.0f;
-        if (weapon.getItem() instanceof BowItem && client.player.isUsingItem()) {
-            int useTicks = client.player.getItemUseTimeLeft();
-            drawPercentage = BowItem.getPullProgress(useTicks);
-        }
-        
-        // Apply power and other enchantments effects
-        // This is a simplification - real implementation would check enchantments
-        int powerLevel = 0; // Would be determined from enchantments
-        float speedMultiplier = 1.0f + (0.5f * powerLevel / 5);
-        
-        // Adjust projectile speed based on weapon type and draw percentage
-        if (weapon.getItem() instanceof BowItem) {
-            projectileSpeed = 3.0f * drawPercentage * speedMultiplier;
-        } else if (weapon.getItem() instanceof CrossbowItem) {
-            projectileSpeed = 3.15f * speedMultiplier;
-        }
-        
-        // Calculate distance to target
-        double distance = client.player.getPos().distanceTo(targetPos);
-        
-        // Estimate time to hit based on distance and projectile speed
-        double timeToHit = distance / projectileSpeed;
-        
-        // Calculate relative velocity (how the target is moving relative to the player)
-        Vec3d relativeVelocity = targetVelocity.subtract(playerVelocity);
-        
-        // Calculate predicted position based on relative movement
-        Vec3d predictedPos = targetPos.add(relativeVelocity.multiply(timeToHit));
-        
-        // Improved gravity compensation
-        // The longer the shot, the more drop needs to be compensated
-        double gravity = 0.05;
-        double verticalAdjustment = 0;
-        
-        if (weapon.getItem() instanceof BowItem) {
-            // More accurate bow trajectory calculation
-            // As draw percentage increases, gravity effect decreases
-            double gravityFactor = (1.0 - drawPercentage) * 0.5 + 0.5; // 0.5 to 1.0
-            verticalAdjustment = gravity * gravityFactor * timeToHit * timeToHit / 2;
-        } else if (weapon.getItem() instanceof CrossbowItem) {
-            // Crossbows are more accurate with less drop
-            verticalAdjustment = gravity * 0.6 * timeToHit * timeToHit / 2;
-        } else {
-            // Default calculation
-            verticalAdjustment = gravity * timeToHit * timeToHit / 2;
-        }
-        
-        // Apply vertical adjustment (aim higher to compensate for gravity)
-        predictedPos = predictedPos.add(0, verticalAdjustment, 0);
-        
-        // Check if the predicted position is obstructed
-        if (isPositionObstructed(playerPos, predictedPos)) {
-            // Try alternate positions on the target's hitbox
-            Vec3d alternatePos = findAlternateAimPosition(target, playerPos, timeToHit, relativeVelocity, gravity);
-            if (alternatePos != null) {
-                return alternatePos;
-            }
-        }
-        
-        return predictedPos;
-    }
-    
-    /**
-     * Checks if there's an obstruction between two points
-     */
-    private static boolean isPositionObstructed(Vec3d from, Vec3d to) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.world == null) return true;
-        
-        // Calculate direction vector
-        Vec3d direction = to.subtract(from);
-        double length = direction.length();
-        if (length < 0.1) return false; // Too close, no obstruction
-        
-        Vec3d normalizedDir = direction.normalize();
-        
-        // Perform a manual raycast check
-        for (double d = 0.1; d < length; d += 0.5) {
-            Vec3d pos = from.add(normalizedDir.multiply(d));
-            if (!client.world.isAir(new net.minecraft.util.math.BlockPos((int)pos.x, (int)pos.y, (int)pos.z))) {
-                return true; // Found a non-air block, there's an obstruction
-            }
-        }
-        
-        return false; // No obstruction found
-    }
-    
-    /**
-     * Finds an alternate position on the hitbox that isn't obstructed
-     */
-    private static Vec3d findAlternateAimPosition(LivingEntity target, Vec3d playerPos, 
-                                               double timeToHit, Vec3d relativeVelocity, double gravity) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.world == null) return null;
-        
-        // Get the target's hitbox dimensions
-        float width = target.getWidth();
-        float height = target.getHeight();
-        
-        // Create a list of points to check on the hitbox, starting from important areas
-        List<Vec3d> hitboxPoints = new ArrayList<>();
-        
-        // Base position with future predicted movement
-        Vec3d basePos = target.getPos().add(relativeVelocity.multiply(timeToHit));
-        
-        // Add center points at different heights (head, torso, legs)
-        hitboxPoints.add(basePos.add(0, height * 0.8, 0)); // Head
-        hitboxPoints.add(basePos.add(0, height * 0.5, 0)); // Torso (center priority)
-        hitboxPoints.add(basePos.add(0, height * 0.2, 0)); // Legs
-        
-        // Add corner points and sides with more granularity
-        float halfWidth = width / 2;
-        for (double y = 0.1; y <= 0.9; y += 0.2) { // More granular height sampling
-            double yPos = height * y;
-            // Sides - cardinal directions
-            hitboxPoints.add(basePos.add(halfWidth, yPos, 0));
-            hitboxPoints.add(basePos.add(-halfWidth, yPos, 0));
-            hitboxPoints.add(basePos.add(0, yPos, halfWidth));
-            hitboxPoints.add(basePos.add(0, yPos, -halfWidth));
-            
-            // Corners
-            hitboxPoints.add(basePos.add(halfWidth, yPos, halfWidth));
-            hitboxPoints.add(basePos.add(halfWidth, yPos, -halfWidth));
-            hitboxPoints.add(basePos.add(-halfWidth, yPos, halfWidth));
-            hitboxPoints.add(basePos.add(-halfWidth, yPos, -halfWidth));
-            
-            // Add some intermediate points between center and edges (25% and 75% distance)
-            float quarterWidth = halfWidth * 0.5f;
-            hitboxPoints.add(basePos.add(quarterWidth, yPos, quarterWidth));
-            hitboxPoints.add(basePos.add(quarterWidth, yPos, -quarterWidth));
-            hitboxPoints.add(basePos.add(-quarterWidth, yPos, quarterWidth));
-            hitboxPoints.add(basePos.add(-quarterWidth, yPos, -quarterWidth));
-        }
-        
-        // Check each point
-        for (Vec3d point : hitboxPoints) {
-            // Calculate predicted position for this point
-            Vec3d predictedPos = point;
-            
-            // Account for gravity
-            double verticalAdjustment = gravity * timeToHit * timeToHit / 2;
-            predictedPos = predictedPos.add(0, verticalAdjustment, 0);
-            
-            // Check if this position is unobstructed
-            if (!isPositionObstructed(playerPos, predictedPos)) {
-                return predictedPos;
-            }
-        }
-        
-        // If all points are obstructed, try to find a position player can see with raycast
-        Vec3d visiblePoint = findVisiblePointWithRaycast(target, playerPos);
-        if (visiblePoint != null) {
-            return visiblePoint;
-        }
-        
-        // As a last resort, try to calculate an arcing trajectory
-        return calculateArcingTrajectory(target, playerPos, timeToHit, relativeVelocity, gravity);
-    }
-    
-    /**
-     * Finds any visible point on target using raycast
-     */
-    private static Vec3d findVisiblePointWithRaycast(LivingEntity target, Vec3d playerPos) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.world == null) return null;
-        
-        // Get target's hitbox dimensions
-        float width = target.getWidth();
-        float height = target.getHeight();
-        Vec3d targetCenter = target.getPos().add(0, height / 2, 0);
-        
-        // Try multiple points around the entity in a spiral pattern
-        // We'll create a sampling of points in concentric rings
-        List<Vec3d> samplePoints = new ArrayList<>();
-        
-        // Center first - highest priority
-        samplePoints.add(targetCenter);
-        
-        // Then try points around the center in a 3D spiral
-        for (int ring = 1; ring <= 3; ring++) {
-            double ringRadius = width * 0.3 * ring;
-            int pointsInRing = 4 + (ring * 2); // More points in outer rings
-            
-            for (int i = 0; i < pointsInRing; i++) {
-                double angle = (2 * Math.PI * i) / pointsInRing;
-                
-                // Create points at different heights
-                for (double h = 0.2; h <= 0.8; h += 0.3) {
-                    double y = target.getPos().y + (height * h);
-                    double x = target.getPos().x + (Math.cos(angle) * ringRadius);
-                    double z = target.getPos().z + (Math.sin(angle) * ringRadius);
-                    
-                    samplePoints.add(new Vec3d(x, y, z));
-                }
-            }
-        }
-        
-        // Check each point for visibility
-        for (Vec3d point : samplePoints) {
-            if (!isPositionObstructed(playerPos, point)) {
-                return point; // Found a visible point
-            }
-        }
-        
-        // If no point is directly visible, return the center position
-        return targetCenter;
-    }
-    
-    /**
-     * Calculates an arcing trajectory when direct line of sight is blocked
-     */
-    private static Vec3d calculateArcingTrajectory(LivingEntity target, Vec3d playerPos, 
-                                               double timeToHit, Vec3d relativeVelocity, double gravity) {
-        // Get target position (center of hitbox)
-        Vec3d targetPos = target.getPos().add(0, target.getHeight() / 2, 0)
-                              .add(relativeVelocity.multiply(timeToHit));
-        
-        // Calculate horizontal distance
-        double horizontalDist = Math.sqrt(
-            Math.pow(targetPos.x - playerPos.x, 2) + 
-            Math.pow(targetPos.z - playerPos.z, 2)
-        );
-        
-        // Increase arc height based on distance
-        double arcHeight = Math.min(5.0, horizontalDist * 0.3); // Higher arc for longer shots
-        
-        // Create a point above the target for arcing
-        Vec3d arcedPos = targetPos.add(0, arcHeight, 0);
-        
-        // Return the arced position
-        return arcedPos;
-    }
-    
-    /**
-     * Check if current target is valid
-     */
-    private static boolean isTargetValid() {
-        return currentTarget != null && currentTarget.isAlive();
-    }
-    
-    /**
      * Handles the aim lock key press
      */
     public static void handleAimLockKeyPress() {
@@ -717,24 +498,15 @@ public class CombatHudFeature {
      * Updates player's view to look at the aim target
      */
     private static void updatePlayerViewToTarget(MinecraftClient client, ItemStack weapon) {
-        if (!isTargetValid()) return;
-        
-        // Calculate where to aim
-        Vec3d aimPos = calculateAimPosition(currentTarget, weapon);
+        if (!targetingSystem.isTargetValid()) return;
+        List<Vec3d> dummyPath = new ArrayList<>();
+        Vec3d aimPos = targetingSystem.calculateIdealAimPosition(targetingSystem.getCurrentTarget(), weapon, dummyPath);
         if (aimPos == null) return;
-        
-        // Get player's position (eye level)
         Vec3d playerPos = client.player.getEyePos();
-        
-        // Calculate the direction vector from player to aim position
         Vec3d direction = aimPos.subtract(playerPos).normalize();
-        
-        // Convert direction vector to yaw and pitch
         double horizontalDistance = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
         float yaw = (float) Math.toDegrees(Math.atan2(direction.z, direction.x)) - 90.0F;
         float pitch = (float) -Math.toDegrees(Math.atan2(direction.y, horizontalDistance));
-        
-        // Set player's rotation
         client.player.setYaw(yaw);
         client.player.setPitch(pitch);
     }
