@@ -177,7 +177,6 @@ public class TargetingSystem {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.world == null) return null;
         Vec3d shooterPos = client.player.getEyePos();
-        Vec3d shooterVel = client.player.getVelocity();
         Vec3d targetPos = target.getPos().add(0, target.getHeight() * 0.5, 0);
         Vec3d targetVel = target.getVelocity();
         boolean isOnGround = target.isOnGround();
@@ -234,8 +233,6 @@ public class TargetingSystem {
             double dz = predictedTarget.z - shooterPos.z;
             double dxz = Math.sqrt(dx * dx + dz * dz);
             // 1. Arrow inherits player velocity (horizontal only)
-            double inheritX = shooterVel.x;
-            double inheritZ = shooterVel.z;
             double v2 = projectileSpeed * projectileSpeed;
             double g = gravity;
             double root = v2 * v2 - g * (g * dxz * dxz + 2 * dy * v2);
@@ -249,7 +246,6 @@ public class TargetingSystem {
             time = newTime;
         }
         // Final predicted target
-        Vec3d aimTarget = predictedTarget;
         // Now, simulate the projectile's path to this point and check for block collisions
         // (Removed: pathIsBlocked check, always return the predicted target for rendering the circle)
         return predictedTarget;

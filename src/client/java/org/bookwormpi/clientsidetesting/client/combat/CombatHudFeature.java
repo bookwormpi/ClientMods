@@ -8,7 +8,6 @@ import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.projectile.ProjectileUtil;
 import net.minecraft.item.BowItem;
 import net.minecraft.item.CrossbowItem;
@@ -25,14 +24,9 @@ import java.util.Comparator;
 import java.util.List;
 
 public class CombatHudFeature {
-    // Targeting system variables
-    private static final double TARGET_RANGE = 64.0;
-    private static long lastTargetSwitchTime;
-    private static final long TARGET_SWITCH_COOLDOWN = 2000; // 2 seconds in milliseconds
-    
     // Aim lock system variables
     private static boolean aimLockEnabled = false;
-    
+
     // Visual settings
     private static final float BASE_SQUARE_SIZE = 0.5f;
     private static final float BASE_CIRCLE_SIZE = 0.3f;
@@ -40,12 +34,15 @@ public class CombatHudFeature {
     private static final float MIN_SCALE = 0.3f; // Minimum scale to prevent tiny indicators
     private static final float MAX_SCALE = 2.0f; // Maximum scale to prevent huge indicators
 
+    // Range settings
+    private static final double BASE_TARGET_RANGE = 64.0;
+
     // Targeting system instance
     private static final TargetingSystem targetingSystem = new TargetingSystem();
 
     public static void register() {
         WorldRenderEvents.AFTER_ENTITIES.register(CombatHudFeature::onWorldRender);
-        
+
         // Register a tick event to check for hits on entities
         ClientTickEvents.END_CLIENT_TICK.register(CombatHudFeature::onClientTick);
     }
@@ -55,66 +52,66 @@ public class CombatHudFeature {
      */
     private static void onWorldRender(WorldRenderContext context) {
         if (!ClientsidetestingClient.showCombatHud) return;
-        
+
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.world == null || client.player == null) return;
-        
+
         // Only show HUD when holding bow or crossbow
         ItemStack heldItem = client.player.getMainHandStack();
         if (!(heldItem.getItem() instanceof BowItem || heldItem.getItem() instanceof CrossbowItem)) {
             return;
         }
-        
+
         MatrixStack matrices = context.matrixStack();
         Vec3d cameraPos = context.camera().getPos();
         VertexConsumerProvider.Immediate vertexConsumers = client.getBufferBuilders().getEntityVertexConsumers();
 
         // Render squares around all targetable entities
         renderEntitySquares(matrices, vertexConsumers, cameraPos);
-        
+
         // Draw aim prediction circle if we have a valid target
         if (targetingSystem.isTargetValid()) {
             renderAimAssistCircle(matrices, vertexConsumers, cameraPos, heldItem);
             renderPredictedPath(matrices, vertexConsumers, cameraPos, heldItem);
         }
-        
+
         vertexConsumers.draw(); // Important: draw after all rendering is done
     }
-    
+
     /**
      * Client tick handler to detect when player hits a mob
      */
     private static void onClientTick(MinecraftClient client) {
         if (!ClientsidetestingClient.showCombatHud) return;
         if (client.player == null || client.world == null) return;
-        
+
         // Only monitor hits when holding bow or crossbow
         ItemStack heldItem = client.player.getMainHandStack();
         if (!(heldItem.getItem() instanceof BowItem || heldItem.getItem() instanceof CrossbowItem)) {
             return;
         }
-        
+
         // Check for entity hit with raycast
         Entity hitEntity = getPlayerAttackTarget();
-        if (hitEntity instanceof LivingEntity && 
+        if (hitEntity instanceof LivingEntity &&
             !hitEntity.equals(targetingSystem.getCurrentTarget()) && hitEntity.isAlive()) {
             // Player has hit a different living entity - switch target to it
             // Use targetingSystem logic if needed
         }
-        
+
         // Handle aim lock if enabled
         if (aimLockEnabled && targetingSystem.isTargetValid()) {
             updatePlayerViewToTarget(client, heldItem);
         }
     }
-    
+
     /**
      * Gets the entity the player is currently attacking
      */
     private static Entity getPlayerAttackTarget() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.world == null) return null;
-        
+
         // Check if player is currently attacking
         if (client.options.attackKey.isPressed()) {
             // Perform a raycast in the direction player is looking
@@ -122,7 +119,7 @@ public class CombatHudFeature {
             Vec3d lookVec = client.player.getRotationVec(1.0f);
             double reach = 5.0; // Use standard reach distance
             Vec3d targetPos = eyePos.add(lookVec.multiply(reach));
-            
+
             // Check for entity hit
             EntityHitResult hitResult = ProjectileUtil.getEntityCollision(
                 client.world,
@@ -135,19 +132,19 @@ public class CombatHudFeature {
                         entity.isAlive() && // Only living entities
                         !entity.isSpectator() // Exclude spectators
             );
-            
+
             if (hitResult != null) {
                 return hitResult.getEntity();
             }
         }
-        
+
         return null;
     }
-    
+
     /**
      * Renders a small square around all targetable entities
      */
-    private static void renderEntitySquares(MatrixStack matrices, VertexConsumerProvider vertexConsumers, 
+    private static void renderEntitySquares(MatrixStack matrices, VertexConsumerProvider vertexConsumers,
                                                   Vec3d cameraPos) {
         List<LivingEntity> entities = targetingSystem.getEligibleMobsInRange();
         for (LivingEntity entity : entities) {
@@ -155,25 +152,25 @@ public class CombatHudFeature {
             double x = entityPos.x - cameraPos.x;
             double y = entityPos.y + entity.getHeight() + 0.5 - cameraPos.y;
             double z = entityPos.z - cameraPos.z;
-            
+
             boolean isTarget = entity.equals(targetingSystem.getCurrentTarget());
             float r = isTarget ? 1.0f : 0.0f;
             float g = isTarget ? 0.0f : 1.0f;
             float b = 0.0f;
             float a = 0.8f;
-            
+
             // Calculate distance to entity
             double distance = Math.sqrt(x*x + y*y + z*z);
-            
+
             // Scale size based on distance
             float scale = calculateDistanceScale(distance);
             float squareSize = BASE_SQUARE_SIZE * scale;
-            
+
             // Draw a square always facing the player
             drawSquare(matrices, vertexConsumers, x, y, z, squareSize, r, g, b, a);
         }
     }
-    
+
     /**
      * Renders a square at the given position that always faces the camera
      */
@@ -181,14 +178,14 @@ public class CombatHudFeature {
                                   double x, double y, double z, float size, float r, float g, float b, float a) {
         matrices.push();
         matrices.translate(x, y, z);
-        
+
         // Make the square face the camera
         matrices.multiply(MinecraftClient.getInstance().gameRenderer.getCamera().getRotation());
-        
+
         VertexConsumer lines = vertexConsumers.getBuffer(RenderLayer.getLines());
-        
+
         float half = size / 2;
-        
+
         // Draw the square outline
         // Top edge
         lines.vertex(matrices.peek().getPositionMatrix(), -half, -half, 0)
@@ -197,7 +194,7 @@ public class CombatHudFeature {
         lines.vertex(matrices.peek().getPositionMatrix(), half, -half, 0)
             .color(r, g, b, a)
             .normal(0.0f, 1.0f, 0.0f);
-        
+
         // Right edge
         lines.vertex(matrices.peek().getPositionMatrix(), half, -half, 0)
             .color(r, g, b, a)
@@ -205,7 +202,7 @@ public class CombatHudFeature {
         lines.vertex(matrices.peek().getPositionMatrix(), half, half, 0)
             .color(r, g, b, a)
             .normal(0.0f, 1.0f, 0.0f);
-        
+
         // Bottom edge
         lines.vertex(matrices.peek().getPositionMatrix(), half, half, 0)
             .color(r, g, b, a)
@@ -213,7 +210,7 @@ public class CombatHudFeature {
         lines.vertex(matrices.peek().getPositionMatrix(), -half, half, 0)
             .color(r, g, b, a)
             .normal(0.0f, 1.0f, 0.0f);
-        
+
         // Left edge
         lines.vertex(matrices.peek().getPositionMatrix(), -half, half, 0)
             .color(r, g, b, a)
@@ -221,10 +218,10 @@ public class CombatHudFeature {
         lines.vertex(matrices.peek().getPositionMatrix(), -half, -half, 0)
             .color(r, g, b, a)
             .normal(0.0f, 1.0f, 0.0f);
-        
+
         matrices.pop();
     }
-    
+
     /**
      * Renders the aim assist circle at the predicted position
      */
@@ -248,7 +245,7 @@ public class CombatHudFeature {
         float alpha = 0.8f;
         drawCircle(matrices, vertexConsumers, x, y, z, circleRadius, red, green, blue, alpha);
     }
-    
+
     /**
      * Draws a circle that always faces the camera
      */
@@ -256,25 +253,25 @@ public class CombatHudFeature {
                                   double x, double y, double z, float radius, float r, float g, float b, float a) {
         matrices.push();
         matrices.translate(x, y, z);
-        
+
         // Make the circle face the camera
         matrices.multiply(MinecraftClient.getInstance().gameRenderer.getCamera().getRotation());
-        
+
         VertexConsumer lines = vertexConsumers.getBuffer(RenderLayer.getLines());
-        
+
         // Draw the circle with line segments
         int segments = 20;
         double angleStep = 2 * Math.PI / segments;
-        
+
         for (int i = 0; i < segments; i++) {
             double angle1 = i * angleStep;
             double angle2 = (i + 1) * angleStep;
-            
+
             float x1 = (float) (Math.cos(angle1) * radius);
             float y1 = (float) (Math.sin(angle1) * radius);
             float x2 = (float) (Math.cos(angle2) * radius);
             float y2 = (float) (Math.sin(angle2) * radius);
-            
+
             lines.vertex(matrices.peek().getPositionMatrix(), x1, y1, 0)
                 .color(r, g, b, a)
                 .normal(0.0f, 1.0f, 0.0f);
@@ -282,10 +279,10 @@ public class CombatHudFeature {
                 .color(r, g, b, a)
                 .normal(0.0f, 1.0f, 0.0f);
         }
-        
+
         matrices.pop();
     }
-    
+
     /**
      * Renders the predicted projectile path in the world using line segments.
      */
@@ -312,55 +309,32 @@ public class CombatHudFeature {
         }
         matrices.pop();
     }
-    
+
     /**
      * Calculates appropriate scale based on distance to maintain consistent visual size
      */
     private static float calculateDistanceScale(double distance) {
         // Linear scaling with distance
         float scale = (float)(distance * DISTANCE_SCALE_FACTOR);
-        
+
         // Constrain scale to reasonable limits
         return Math.max(MIN_SCALE, Math.min(scale, MAX_SCALE));
     }
-    
-    /**
-     * Gets all hostile entities in range
-     */
-    public static List<LivingEntity> getHostileEntitiesInRange() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        List<LivingEntity> hostiles = new ArrayList<>();
-        
-        if (client.player == null || client.world == null) return hostiles;
 
-        Vec3d playerPos = client.player.getPos();
-        Box searchBox = new Box(
-                playerPos.x - TARGET_RANGE, playerPos.y - TARGET_RANGE, playerPos.z - TARGET_RANGE,
-                playerPos.x + TARGET_RANGE, playerPos.y + TARGET_RANGE, playerPos.z + TARGET_RANGE);
-        
-        for (Entity entity : client.world.getEntitiesByClass(LivingEntity.class, searchBox, e -> e instanceof HostileEntity)) {
-            hostiles.add((LivingEntity) entity);
-        }
-        
-        // Sort by distance to player
-        hostiles.sort(Comparator.comparingDouble(entity -> entity.squaredDistanceTo(client.player)));
-        return hostiles;
-    }
-    
     /**
      * Gets all living entities in range (including players)
      */
     public static List<LivingEntity> getAllLivingEntitiesInRange() {
         MinecraftClient client = MinecraftClient.getInstance();
         List<LivingEntity> entities = new ArrayList<>();
-        
+
         if (client.player == null || client.world == null) return entities;
 
         Vec3d playerPos = client.player.getPos();
         Box searchBox = new Box(
-                playerPos.x - TARGET_RANGE, playerPos.y - TARGET_RANGE, playerPos.z - TARGET_RANGE,
-                playerPos.x + TARGET_RANGE, playerPos.y + TARGET_RANGE, playerPos.z + TARGET_RANGE);
-        
+                playerPos.x - BASE_TARGET_RANGE, playerPos.y - BASE_TARGET_RANGE, playerPos.z - BASE_TARGET_RANGE,
+                playerPos.x + BASE_TARGET_RANGE, playerPos.y + BASE_TARGET_RANGE, playerPos.z + BASE_TARGET_RANGE);
+
         // Get all living entities (mobs and players)
         for (Entity entity : client.world.getEntitiesByClass(LivingEntity.class, searchBox, e -> 
                 e != client.player && // Exclude the client player
@@ -368,12 +342,12 @@ public class CombatHudFeature {
                 !e.isSpectator())) { // Exclude spectators
             entities.add((LivingEntity) entity);
         }
-        
+
         // Sort by distance to player
         entities.sort(Comparator.comparingDouble(entity -> entity.squaredDistanceTo(client.player)));
         return entities;
     }
-    
+
     /**
      * Handles the target cycle key press (now selects the mob closest to the player's crosshair within 5 degrees, not including bats)
      */
@@ -423,7 +397,7 @@ public class CombatHudFeature {
             targetingSystem.setCurrentTarget(best);
         }
     }
-    
+
     /**
      * Cycles to the next target in the list
      */
@@ -432,7 +406,7 @@ public class CombatHudFeature {
         if (entities.isEmpty()) {
             return;
         }
-        
+
         LivingEntity currentTarget = targetingSystem.getCurrentTarget();
         if (currentTarget == null || !entities.contains(currentTarget)) {
             // If no current target or it's not in range anymore, choose the closest
@@ -444,56 +418,25 @@ public class CombatHudFeature {
             targetingSystem.setCurrentTarget(entities.get(nextIndex));
         }
     }
-    
-    /**
-     * Checks if the player is looking at a hostile entity
-     */
-    private static LivingEntity getLookTargetEntity() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null || client.world == null) return null;
-        
-        Vec3d playerPos = client.player.getEyePos();
-        Vec3d lookVec = client.player.getRotationVec(1.0f);
-        Vec3d targetVec = playerPos.add(lookVec.multiply(TARGET_RANGE));
-        
-        // Perform entity raycast
-        EntityHitResult result = ProjectileUtil.getEntityCollision(
-                client.world,
-                client.player,
-                playerPos,
-                targetVec,
-                new Box(playerPos, targetVec).expand(1.0),
-                entity -> entity instanceof LivingEntity && // Target any living entity
-                          entity != client.player && // Don't target self
-                          entity.isAlive() && // Only living entities
-                          !entity.isSpectator() // Exclude spectators
-        );
-        
-        if (result != null && result.getEntity() instanceof LivingEntity) {
-            return (LivingEntity) result.getEntity();
-        }
-        
-        return null;
-    }
-    
+
     /**
      * Handles the aim lock key press
      */
     public static void handleAimLockKeyPress() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.world == null) return;
-        
+
         // Check if player is holding a bow or crossbow
         ItemStack heldItem = client.player.getMainHandStack();
         if (!(heldItem.getItem() instanceof BowItem || heldItem.getItem() instanceof CrossbowItem)) {
             aimLockEnabled = false;
             return;
         }
-        
+
         // Toggle aim lock status
         aimLockEnabled = !aimLockEnabled;
     }
-    
+
     /**
      * Updates player's view to look at the aim target
      */
