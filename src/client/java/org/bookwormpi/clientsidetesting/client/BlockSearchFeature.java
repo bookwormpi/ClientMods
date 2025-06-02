@@ -274,10 +274,6 @@ public class BlockSearchFeature {
         buffer.vertex(entry.getPositionMatrix(), (float)(x + dx1), (float)(y + dy1), (float)(z + dz1)).color(r, g, b, a).normal(nx, ny, nz);
     }
 
-    public static void rescanBlocks(MinecraftClient client, ChunkPos playerChunk) {
-        // Deprecated: use requestScan instead
-    }
-
     // --- GUI/Config API for BlockSearchFeature ---
     public static void setBlockToSearch(Block block) {
         blockToSearch = block;
