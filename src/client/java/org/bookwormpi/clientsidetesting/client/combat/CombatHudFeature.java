@@ -1,9 +1,12 @@
 package org.bookwormpi.clientsidetesting.client.combat;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.HudLayerRegistrationCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.IdentifiedLayer;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
@@ -12,6 +15,7 @@ import net.minecraft.entity.projectile.ProjectileUtil;
 import net.minecraft.item.BowItem;
 import net.minecraft.item.CrossbowItem;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
@@ -24,6 +28,10 @@ import java.util.Comparator;
 import java.util.List;
 
 public class CombatHudFeature {
+    // Mod identifier for HUD layer registration
+    private static final String MOD_ID = "clientsidetesting";
+    private static final Identifier HUD_LAYER_ID = Identifier.of(MOD_ID, "combat-hud");
+    
     // Aim lock system variables
     private static boolean aimLockEnabled = false;
 
@@ -41,10 +49,94 @@ public class CombatHudFeature {
     private static final TargetingSystem targetingSystem = new TargetingSystem();
 
     public static void register() {
+        // Register the new HUD layer for 2D overlay elements (aim lock indicators)
+        HudLayerRegistrationCallback.EVENT.register(layeredDrawer -> 
+            layeredDrawer.attachLayerBefore(IdentifiedLayer.CROSSHAIR, HUD_LAYER_ID, CombatHudFeature::renderHudOverlay));
+        
+        // Keep world rendering for 3D elements (entity squares, trajectory lines, aim circles)
         WorldRenderEvents.AFTER_ENTITIES.register(CombatHudFeature::onWorldRender);
 
         // Register a tick event to check for hits on entities
         ClientTickEvents.END_CLIENT_TICK.register(CombatHudFeature::onClientTick);
+    }
+
+    /**
+     * New HUD overlay rendering method for Fabric 1.21.4
+     * Renders 2D overlay elements that should appear over the UI
+     */
+    private static void renderHudOverlay(DrawContext context, RenderTickCounter tickCounter) {
+        if (!ClientsidetestingClient.showCombatHud) return;
+
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.world == null || client.player == null) return;
+
+        // Only show HUD when holding bow or crossbow
+        ItemStack heldItem = client.player.getMainHandStack();
+        if (!(heldItem.getItem() instanceof BowItem || heldItem.getItem() instanceof CrossbowItem)) {
+            return;
+        }
+
+        // For now, we'll keep most rendering in world space since that works better for 3D indicators
+        // This method can be used for 2D crosshair overlays or UI elements in the future
+        
+        // Get screen dimensions and center position
+        int screenWidth = client.getWindow().getScaledWidth();
+        int screenHeight = client.getWindow().getScaledHeight();
+        int centerX = screenWidth / 2;
+        int centerY = screenHeight / 2;
+        
+        // Create time variable for AIM LOCK fade animation
+        double time = client.world.getTime() * 0.1;
+        
+        // Enhanced status indicator when aim lock is enabled with consistent fade in/out animation
+        if (aimLockEnabled && targetingSystem.isTargetValid()) {
+            // Calculate consistent fade in/out alpha using absolute sine for smooth transitions
+            float fadeAlpha = (float) (0.3 + 0.7 * Math.abs(Math.sin(time * 1.5))); // 30%-100% opacity range
+            int alpha = (int) (fadeAlpha * 255);
+            int color = (alpha << 24) | 0x00FF0000; // Red with fading alpha
+            
+            // Draw the "AIM LOCK" text above the crosshair
+            String text = "AIM LOCK";
+            int textWidth = client.textRenderer.getWidth(text);
+            int textY = centerY - 25; // Position above crosshair
+            context.drawText(client.textRenderer, text, centerX - textWidth/2, textY, color, true);
+        }
+        
+        // Target information panel - show when we have a valid target
+        if (targetingSystem.isTargetValid()) {
+            LivingEntity target = targetingSystem.getCurrentTarget();
+            Vec3d playerPos = client.player.getEyePos();
+            Vec3d targetPos = target.getPos().add(0, target.getHeight() * 0.5, 0);
+            
+            // Calculate distance to target
+            double distance = playerPos.distanceTo(targetPos);
+            
+            // Calculate time to impact using ballistic calculations
+            double timeToImpact = calculateTimeToImpact(target, heldItem);
+            
+            // Static white color for target info (no pulsing)
+            int infoColor = 0xFFFFFFFF; // Solid white
+            
+            // Target name - above crosshair
+            String targetName = getTargetDisplayName(target);
+            int nameWidth = client.textRenderer.getWidth(targetName);
+            context.drawText(client.textRenderer, targetName, centerX - nameWidth/2, centerY - 40, infoColor, true);
+            
+            // Distance - below crosshair
+            String distanceText = String.format("%.1fm", distance);
+            int distanceWidth = client.textRenderer.getWidth(distanceText);
+            context.drawText(client.textRenderer, distanceText, centerX - distanceWidth/2, centerY + 15, infoColor, true);
+            
+            // Time to impact - below distance
+            if (timeToImpact > 0) {
+                String timeText = String.format("%.1fs", timeToImpact);
+                int timeWidth = client.textRenderer.getWidth(timeText);
+                context.drawText(client.textRenderer, timeText, centerX - timeWidth/2, centerY + 27, infoColor, true);
+            }
+            
+            // Health bar - left of crosshair (static, no pulsing)
+            renderTargetHealthBar(context, target, centerX - 60, centerY - 5);
+        }
     }
 
     /**
@@ -399,27 +491,6 @@ public class CombatHudFeature {
     }
 
     /**
-     * Cycles to the next target in the list
-     */
-    private static void cycleToNextTarget() {
-        List<LivingEntity> entities = getAllLivingEntitiesInRange();
-        if (entities.isEmpty()) {
-            return;
-        }
-
-        LivingEntity currentTarget = targetingSystem.getCurrentTarget();
-        if (currentTarget == null || !entities.contains(currentTarget)) {
-            // If no current target or it's not in range anymore, choose the closest
-            targetingSystem.setCurrentTarget(entities.get(0));
-        } else {
-            // Find current target's index and move to next
-            int currentIndex = entities.indexOf(currentTarget);
-            int nextIndex = (currentIndex + 1) % entities.size();
-            targetingSystem.setCurrentTarget(entities.get(nextIndex));
-        }
-    }
-
-    /**
      * Handles the aim lock key press
      */
     public static void handleAimLockKeyPress() {
@@ -452,5 +523,97 @@ public class CombatHudFeature {
         float pitch = (float) -Math.toDegrees(Math.atan2(direction.y, horizontalDistance));
         client.player.setYaw(yaw);
         client.player.setPitch(pitch);
+    }
+
+    /**
+     * Calculates the time it takes for a projectile to reach the target
+     */
+    private static double calculateTimeToImpact(LivingEntity target, ItemStack weapon) {
+        if (target == null) return 0.0;
+        
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) return 0.0;
+        
+        Vec3d shooterPos = client.player.getEyePos();
+        Vec3d targetPos = target.getPos().add(0, target.getHeight() * 0.5, 0);
+        
+        // Calculate projectile speed based on weapon type
+        float projectileSpeed = 3.0f;
+        if (weapon.getItem() instanceof BowItem && client.player.isUsingItem()) {
+            int useTicks = client.player.getItemUseTimeLeft();
+            float draw = BowItem.getPullProgress(useTicks);
+            projectileSpeed = 3.0f * draw;
+        } else if (weapon.getItem() instanceof CrossbowItem) {
+            projectileSpeed = 3.15f;
+        }
+        
+        // Simple time calculation (ignoring arc for display purposes)
+        double distance = shooterPos.distanceTo(targetPos);
+        return distance / projectileSpeed;
+    }
+    
+    /**
+     * Gets a display-friendly name for the target entity
+     */
+    private static String getTargetDisplayName(LivingEntity target) {
+        if (target == null) return "Unknown";
+        
+        // Try to get custom name first
+        if (target.hasCustomName()) {
+            return target.getCustomName().getString();
+        }
+        
+        // Get entity type name
+        String entityName = target.getType().getTranslationKey();
+        
+        // Clean up the translation key for display
+        if (entityName.startsWith("entity.minecraft.")) {
+            entityName = entityName.substring(17); // Remove "entity.minecraft."
+        }
+        
+        // Capitalize first letter and replace underscores with spaces
+        if (!entityName.isEmpty()) {
+            entityName = entityName.substring(0, 1).toUpperCase() + 
+                        entityName.substring(1).replace("_", " ");
+        }
+        
+        return entityName;
+    }
+    
+    /**
+     * Renders a health bar for the target entity with static appearance
+     */
+    private static void renderTargetHealthBar(DrawContext context, LivingEntity target, 
+                                            int x, int y) {
+        if (target == null) return;
+        
+        float currentHealth = target.getHealth();
+        float maxHealth = target.getMaxHealth();
+        float healthRatio = Math.max(0.0f, Math.min(1.0f, currentHealth / maxHealth));
+        
+        // Health bar dimensions
+        int barWidth = 40;
+        int barHeight = 4;
+        
+        // Background (dark red) - static with 50% opacity
+        int bgColor = (128 << 24) | 0x00440000; // Static dark red background
+        context.fill(x, y, x + barWidth, y + barHeight, bgColor);
+        
+        // Health bar (green to red gradient based on health) - static appearance
+        int healthWidth = (int) (barWidth * healthRatio);
+        if (healthWidth > 0) {
+            // Color transitions from green (high health) to red (low health)
+            int red = (int) (255 * (1.0f - healthRatio));
+            int green = (int) (255 * healthRatio);
+            int healthColor = (255 << 24) | (red << 16) | (green << 8); // Full opacity, no pulsing
+            context.fill(x, y, x + healthWidth, y + barHeight, healthColor);
+        }
+        
+        // Health text - static white appearance
+        String healthText = String.format("%.0f/%.0f", currentHealth, maxHealth);
+        int textWidth = MinecraftClient.getInstance().textRenderer.getWidth(healthText);
+        int textColor = 0xFFFFFFFF; // Static white text, full opacity
+        context.drawText(MinecraftClient.getInstance().textRenderer, healthText, 
+                        x + (barWidth - textWidth) / 2, y - 10, textColor, true);
     }
 }
