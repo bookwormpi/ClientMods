@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "clientsidetesting",
+  "version": "${version}",
+  "name": "ClientSideTesting",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/clientsidetesting/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-datagen": [
+      "org.bookwormpi.clientsidetesting.client.ClientsidetestingDataGenerator"
+    ],
+    "client": [
+      "org.bookwormpi.clientsidetesting.client.ClientsidetestingClient"
+    ],
+    "main": [
+      "org.bookwormpi.clientsidetesting.Clientsidetesting"
+    ]
+  },
+  "mixins": [
+    "clientsidetesting.mixins.json",
+    {
+      "config": "clientsidetesting.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
