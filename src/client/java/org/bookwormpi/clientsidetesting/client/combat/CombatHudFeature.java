@@ -441,7 +441,7 @@ public class CombatHudFeature {
     }
 
     /**
-     * Handles the target cycle key press (now selects the mob closest to the player's crosshair within 5 degrees, not including bats)
+     * Handles the target cycle key press (now selects the entity closest to the player's crosshair within 5 degrees, including mobs except bats and other players)
      */
     public static void handleTargetCycleKeyPress() {
         MinecraftClient client = MinecraftClient.getInstance();
@@ -453,7 +453,7 @@ public class CombatHudFeature {
             return;
         }
 
-        // Get all eligible mobs (excluding bats)
+        // Get all eligible entities (mobs excluding bats, and other players)
         List<LivingEntity> mobs = targetingSystem.getEligibleMobsInRange();
         if (mobs.isEmpty()) return;
 

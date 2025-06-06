@@ -2,7 +2,8 @@ package org.bookwormpi.clientsidetesting.client;
 
 import net.minecraft.client.render.*;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.HudLayerRegistrationCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.IdentifiedLayer;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
@@ -10,6 +11,9 @@ import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Vec3d;
@@ -31,6 +35,7 @@ public class BlockSearchFeature {
     private static final int MAX_SCAN_DISTANCE = 16;
     private static final AtomicBoolean scanning = new AtomicBoolean(false);
     private static long lastScanTick = 0;
+    private static final Identifier BLOCK_SEARCH_LAYER = Identifier.of("clientsidetesting", "block-search-layer");
 
     public static void register() {
         // Register the world render event!
@@ -57,7 +62,14 @@ public class BlockSearchFeature {
             }
             return net.minecraft.util.ActionResult.PASS;
         });
-        HudRenderCallback.EVENT.register((drawContext, tickDelta) -> {
+        
+        // Use the new HUD Layer Registration API (replaces deprecated HudRenderCallback)
+        HudLayerRegistrationCallback.EVENT.register(layeredDrawer -> 
+            layeredDrawer.attachLayerBefore(IdentifiedLayer.CHAT, BLOCK_SEARCH_LAYER, BlockSearchFeature::renderHud)
+        );
+    }
+
+    private static void renderHud(DrawContext drawContext, RenderTickCounter tickCounter) {
             if (!enabled || blockToSearch == null) return;
             MinecraftClient client = MinecraftClient.getInstance();
             if (client.player == null) return;
@@ -105,7 +117,6 @@ public class BlockSearchFeature {
             drawContext.drawItem(stack, iconX, iconY);
             drawContext.drawTextWithShadow(textRenderer, blockName, nameX, nameY, 0xFFFFFF);
             drawContext.drawTextWithShadow(textRenderer, coords, coordsX, coordsY, 0xFFFFFF);
-        });
     }
 
     public static void requestScan(MinecraftClient client, ChunkPos playerChunk, Block blockType) {

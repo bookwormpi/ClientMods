@@ -6,6 +6,7 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.passive.BatEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.ProjectileUtil;
 import net.minecraft.item.BowItem;
 import net.minecraft.item.CrossbowItem;
@@ -75,28 +76,29 @@ public class TargetingSystem {
     }
 
     /**
-     * Gets all eligible mobs in range (all MobEntity except bats)
+     * Gets all eligible mobs and players in range (all MobEntity except bats, and all PlayerEntity)
      */
     public List<LivingEntity> getEligibleMobsInRange() {
         MinecraftClient client = MinecraftClient.getInstance();
-        List<LivingEntity> mobs = new ArrayList<>();
-        if (client.player == null || client.world == null) return mobs;
+        List<LivingEntity> entities = new ArrayList<>();
+        if (client.player == null || client.world == null) return entities;
         Vec3d playerPos = client.player.getPos();
         Box searchBox = new Box(
                 playerPos.x - TARGET_RANGE, playerPos.y - TARGET_RANGE, playerPos.z - TARGET_RANGE,
                 playerPos.x + TARGET_RANGE, playerPos.y + TARGET_RANGE, playerPos.z + TARGET_RANGE);
-        for (Entity entity : client.world.getEntitiesByClass(LivingEntity.class, searchBox, e -> e instanceof MobEntity && !(e instanceof BatEntity))) {
+        for (Entity entity : client.world.getEntitiesByClass(LivingEntity.class, searchBox, 
+                e -> (e instanceof MobEntity && !(e instanceof BatEntity)) || (e instanceof PlayerEntity && e != client.player))) {
             if (entity instanceof LivingEntity livingEntity) {
-                mobs.add(livingEntity);
+                entities.add(livingEntity);
             }
         }
         // Sort by distance to player
-        mobs.sort(Comparator.comparingDouble(entity -> entity.squaredDistanceTo(client.player)));
-        return mobs;
+        entities.sort(Comparator.comparingDouble(entity -> entity.squaredDistanceTo(client.player)));
+        return entities;
     }
 
     /**
-     * Cycles to the next target in the list (all mobs except bats)
+     * Cycles to the next target in the list (all mobs except bats, and other players)
      */
     private void cycleToNextTarget() {
         List<LivingEntity> mobs = getEligibleMobsInRange();
@@ -116,7 +118,7 @@ public class TargetingSystem {
     }
 
     /**
-     * Checks if the player is looking at an eligible mob (all mobs except bats)
+     * Checks if the player is looking at an eligible mob or player (all mobs except bats, and other players)
      */
     private LivingEntity getLookTargetEntity() {
         MinecraftClient client = MinecraftClient.getInstance();
@@ -131,7 +133,8 @@ public class TargetingSystem {
                 playerPos,
                 targetVec,
                 new Box(playerPos, targetVec).expand(1.0),
-                entity -> entity instanceof MobEntity && !(entity instanceof BatEntity) && entity.isAlive()
+                entity -> ((entity instanceof MobEntity && !(entity instanceof BatEntity)) || 
+                          (entity instanceof PlayerEntity && entity != client.player)) && entity.isAlive()
         );
         if (result != null && result.getEntity() instanceof LivingEntity) {
             return (LivingEntity) result.getEntity();

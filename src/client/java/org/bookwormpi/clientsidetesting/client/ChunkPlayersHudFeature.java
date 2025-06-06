@@ -1,20 +1,29 @@
 package org.bookwormpi.clientsidetesting.client;
 
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.HudLayerRegistrationCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.IdentifiedLayer;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class ChunkPlayersHudFeature {
     private static final List<String> playersInChunk = new ArrayList<>();
+    private static final Identifier CHUNK_PLAYERS_LAYER = Identifier.of("clientsidetesting", "chunk-players-layer");
 
     public static void register() {
-        // Switch to the new HUD event if available in your Fabric API/Minecraft version.
-        // If not, keep the deprecated HudRenderCallback for now, but add a comment for future migration.
-        HudRenderCallback.EVENT.register((context, tickDelta) -> {
+        // Use the new HUD Layer Registration API (replaces deprecated HudRenderCallback)
+        HudLayerRegistrationCallback.EVENT.register(layeredDrawer -> 
+            layeredDrawer.attachLayerBefore(IdentifiedLayer.CHAT, CHUNK_PLAYERS_LAYER, ChunkPlayersHudFeature::render)
+        );
+    }
+
+    private static void render(DrawContext context, RenderTickCounter tickCounter) {
             if (!ClientsidetestingClient.showChunkPlayers) return;
             MinecraftClient client = MinecraftClient.getInstance();
             if (client.world == null || client.player == null) return;
@@ -49,9 +58,8 @@ public class ChunkPlayersHudFeature {
             int offset = 12;
             int padding = 4;
             for (String name : playersInChunk) {
-                context.drawText(client.textRenderer, Text.literal(name), x, y - offset, 0xFFAAAA, true);
+                context.drawText(client.textRenderer, Text.literal(name), x, y + offset, 0xFFAAAA, true);
                 offset += 12 + padding;
             }
-        });
     }
 }
