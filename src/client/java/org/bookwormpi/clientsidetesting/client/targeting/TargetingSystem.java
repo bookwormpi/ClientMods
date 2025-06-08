@@ -3,6 +3,9 @@ package org.bookwormpi.clientsidetesting.client.targeting;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.boss.dragon.EnderDragonEntity;
+import net.minecraft.entity.boss.WitherEntity;
+import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.passive.BatEntity;
@@ -35,7 +38,7 @@ public class TargetingSystem {
 
     private LivingEntity currentTarget;
     private long lastTargetSwitchTime;
-    private static final long TARGET_SWITCH_COOLDOWN = 0; // 5 seconds in milliseconds
+    private static final long TARGET_SWITCH_COOLDOWN = 0; // 0 seconds in milliseconds
 
     // Performance optimization fields
     private final java.util.Map<LivingEntity, Vec3d> predictionCache = new java.util.HashMap<>();
@@ -152,7 +155,7 @@ public class TargetingSystem {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.world == null) return null;
         Vec3d shooterPos = client.player.getEyePos();
-        Box hitbox = target.getBoundingBox();
+        Box hitbox = getOptimalHitbox(target);
         Vec3d targetPos = hitbox.getCenter();
         double dx = targetPos.x - shooterPos.x;
         double dy = targetPos.y - shooterPos.y;
@@ -198,7 +201,22 @@ public class TargetingSystem {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.world == null) return null;
         Vec3d shooterPos = client.player.getEyePos();
-        Vec3d targetPos = target.getPos().add(0, target.getHeight() * 0.5, 0);
+        
+        // Use optimal hitbox for multi-hitbox entities
+        Box optimalHitbox = getOptimalHitbox(target);
+        Vec3d targetPos;
+        if (optimalHitbox != null) {
+            // Aim at the center of the optimal hitbox
+            targetPos = new Vec3d(
+                (optimalHitbox.minX + optimalHitbox.maxX) * 0.5,
+                (optimalHitbox.minY + optimalHitbox.maxY) * 0.5,
+                (optimalHitbox.minZ + optimalHitbox.maxZ) * 0.5
+            );
+        } else {
+            // Fallback to standard center position
+            targetPos = target.getPos().add(0, target.getHeight() * 0.5, 0);
+        }
+        
         Vec3d targetVel = target.getVelocity();
         boolean isOnGround = target.isOnGround();
         // Check if the entity is more than 2 blocks above the ground
@@ -233,15 +251,22 @@ public class TargetingSystem {
         double time = shooterPos.distanceTo(targetPos) / projectileSpeed;
         Vec3d predictedTarget = targetPos;
         for (int i = 0; i < 8; i++) {
-            double vx = isOnGround ? targetVel.x : 0.0;
-            double vy = 0.0;
-            double vz = 0.0;
+            double vx, vy, vz;
             if (isOnGround) {
+                // Ground targets: use X and Z velocity, Y velocity is 0 (on ground)
+                vx = targetVel.x;
                 vy = 0.0;
-                vz = 0.0;
+                vz = targetVel.z;
             } else if (isOffGround) {
+                // Airborne targets: use full 3D velocity
+                vx = targetVel.x;
                 vy = targetVel.y;
                 vz = targetVel.z;
+            } else {
+                // Default case: no velocity prediction
+                vx = 0.0;
+                vy = 0.0;
+                vz = 0.0;
             }
             double futureY = targetPos.y - vy * time + 0.5 * gravity * time * time;
             predictedTarget = new Vec3d(
@@ -282,7 +307,22 @@ public class TargetingSystem {
         if (client.player == null || client.world == null) return null;
 
         Vec3d shooterPos = client.player.getEyePos();
-        Vec3d targetPos = target.getPos().add(0, target.getHeight() * 0.5, 0);
+        
+        // Use optimal hitbox for multi-hitbox entities
+        Box optimalHitbox = getOptimalHitbox(target);
+        Vec3d targetPos;
+        if (optimalHitbox != null) {
+            // Aim at the center of the optimal hitbox
+            targetPos = new Vec3d(
+                (optimalHitbox.minX + optimalHitbox.maxX) * 0.5,
+                (optimalHitbox.minY + optimalHitbox.maxY) * 0.5,
+                (optimalHitbox.minZ + optimalHitbox.maxZ) * 0.5
+            );
+        } else {
+            // Fallback to standard center position
+            targetPos = target.getPos().add(0, target.getHeight() * 0.5, 0);
+        }
+        
         Vec3d targetVel = target.getVelocity();
         
         // Enhanced projectile speed calculation
@@ -632,6 +672,7 @@ public class TargetingSystem {
 
     /**
      * Environmental analysis for trajectory optimization
+     * Note: Minecraft doesn't have actual wind physics, so wind effects are disabled for accuracy
      */
     public EnvironmentalFactors analyzeEnvironment(Vec3d start, Vec3d target) {
         MinecraftClient client = MinecraftClient.getInstance();
@@ -639,8 +680,9 @@ public class TargetingSystem {
         
         EnvironmentalFactors factors = new EnvironmentalFactors();
         
-        // Wind simulation (based on biome and weather)
-        factors.windEffect = calculateWindEffect(client.world, start);
+        // Wind simulation disabled - Minecraft has no wind physics
+        // factors.windEffect = calculateWindEffect(client.world, start);
+        factors.windEffect = Vec3d.ZERO; // No wind in vanilla Minecraft
         
         // Path obstruction analysis
         factors.obstructionLevel = analyzePathObstruction(start, target, client.world);
@@ -648,17 +690,22 @@ public class TargetingSystem {
         // Elevation advantage calculation
         factors.elevationAdvantage = target.y - start.y;
         
-        // Weather effects
+        // Weather effects disabled - Rain doesn't affect projectiles in vanilla Minecraft
         factors.isRaining = client.world.isRaining();
-        factors.weatherEffect = factors.isRaining ? 0.95 : 1.0; // Slight accuracy reduction in rain
+        factors.weatherEffect = 1.0; // No weather effects in vanilla Minecraft
         
         return factors;
     }
 
     /**
      * Simulate wind effects based on biome and environment
+     * Note: Disabled because Minecraft has no actual wind physics
      */
+    @SuppressWarnings("unused")
     private Vec3d calculateWindEffect(net.minecraft.world.World world, Vec3d position) {
+        // This method is kept for potential future use with modded environments
+        // that might add wind physics, but vanilla Minecraft has no wind effects
+        
         // Simplified wind simulation - in real implementation, could use biome data
         net.minecraft.util.math.BlockPos pos = new net.minecraft.util.math.BlockPos(
             (int)position.x, (int)position.y, (int)position.z);
@@ -703,19 +750,19 @@ public class TargetingSystem {
 
     /**
      * Data class for environmental factors
+     * Note: Most factors disabled to match vanilla Minecraft physics
      */
     public static class EnvironmentalFactors {
-        public Vec3d windEffect = Vec3d.ZERO;
-        public double obstructionLevel = 0.0;
-        public double elevationAdvantage = 0.0;
-        public boolean isRaining = false;
-        public double weatherEffect = 1.0;
+        public Vec3d windEffect = Vec3d.ZERO; // No wind in Minecraft
+        public double obstructionLevel = 0.0; // Kept for analysis only
+        public double elevationAdvantage = 0.0; // No elevation effects in Minecraft
+        public boolean isRaining = false; // No weather effects in Minecraft
+        public double weatherEffect = 1.0; // No weather effects in Minecraft
         
         public double getAccuracyModifier() {
-            double modifier = weatherEffect;
-            modifier *= (1.0 - obstructionLevel * 0.1); // Obstruction reduces accuracy
-            modifier *= (1.0 + Math.max(0, elevationAdvantage) * 0.01); // Height advantage
-            return Math.max(0.5, Math.min(1.2, modifier)); // Clamp between 50%-120%
+            // In vanilla Minecraft, environmental factors don't affect projectile accuracy
+            // Projectiles follow deterministic physics regardless of conditions
+            return 1.0; // Always 100% - no environmental accuracy modifiers in vanilla MC
         }
     }
 
@@ -785,12 +832,224 @@ public class TargetingSystem {
      * Check if a trajectory path intersects with a target's hitbox
      */
     private boolean trajectoryHitsTarget(List<Vec3d> trajectory, LivingEntity target) {
-        net.minecraft.util.math.Box hitbox = target.getBoundingBox();
+        net.minecraft.util.math.Box hitbox = getOptimalHitbox(target);
         for (Vec3d point : trajectory) {
             if (hitbox.contains(point)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Gets the optimal hitbox for targeting. For entities with multiple hitboxes (like Ender Dragon),
+     * returns the largest hitbox. For regular entities, returns their standard bounding box.
+     */
+    public Box getOptimalHitbox(LivingEntity target) {
+        if (target == null) return null;
+        
+        // Handle multi-hitbox entities
+        if (isMultiHitboxEntity(target)) {
+            return getLargestHitbox(target);
+        }
+        
+        // Default to standard bounding box for regular entities
+        return target.getBoundingBox();
+    }
+    
+    /**
+     * Checks if an entity has multiple hitboxes (complex entity like Ender Dragon or Wither)
+     */
+    private boolean isMultiHitboxEntity(LivingEntity entity) {
+        // Ender Dragon has multiple body parts
+        if (entity instanceof EnderDragonEntity) {
+            return true;
+        }
+        
+        // Wither has multiple heads
+        if (entity instanceof WitherEntity) {
+            return true;
+        }
+        
+        // Check for other entities that might have multiple parts
+        // ArmorStands can have multiple collision boxes depending on pose
+        if (entity instanceof ArmorStandEntity) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Gets the largest hitbox from a multi-hitbox entity
+     */
+    private Box getLargestHitbox(LivingEntity entity) {
+        if (entity instanceof EnderDragonEntity dragon) {
+            return getLargestDragonHitbox(dragon);
+        }
+        
+        if (entity instanceof WitherEntity wither) {
+            return getLargestWitherHitbox(wither);
+        }
+        
+        if (entity instanceof ArmorStandEntity armorStand) {
+            return getLargestArmorStandHitbox(armorStand);
+        }
+        
+        // Fallback to standard bounding box
+        return entity.getBoundingBox();
+    }
+    
+    /**
+     * Gets the largest hitbox from an Ender Dragon's multiple parts
+     */
+    private Box getLargestDragonHitbox(EnderDragonEntity dragon) {
+        Box largestBox = dragon.getBoundingBox();
+        double largestVolume = calculateBoxVolume(largestBox);
+        
+        // Try to access dragon parts through reflection or direct access if available
+        try {
+            // The dragon's body is typically the largest part
+            // Dragon parts include: head, neck, body, wing, tail segments
+            // The body segment is usually the largest and most reliable target
+            
+            // Get all potential hitboxes for the dragon
+            java.util.List<Box> dragonHitboxes = new java.util.ArrayList<>();
+            
+            // Add the main body bounding box (usually largest)
+            dragonHitboxes.add(dragon.getBoundingBox());
+            
+            // Create additional boxes for dragon parts based on dragon position and rotation
+            Vec3d dragonPos = dragon.getPos();
+            float yaw = dragon.getYaw();
+            
+            // Body segment (main target) - extend the main hitbox slightly
+            Box bodyBox = dragon.getBoundingBox().expand(2.0, 1.0, 2.0);
+            dragonHitboxes.add(bodyBox);
+            
+            // Head area (in front of dragon based on yaw)
+            // In Minecraft: yaw 0 = south (+Z), yaw 90 = west (-X), yaw 180 = north (-Z), yaw 270 = east (+X)
+            // To get the position in front of the dragon, we need to offset in the facing direction
+            double headX = dragonPos.x - Math.sin(Math.toRadians(yaw)) * 6.0;
+            double headZ = dragonPos.z + Math.cos(Math.toRadians(yaw)) * 6.0;
+            Box headBox = new Box(headX - 2, dragonPos.y - 1, headZ - 2, 
+                                headX + 2, dragonPos.y + 3, headZ + 2);
+            dragonHitboxes.add(headBox);
+            
+            // Find the largest box
+            for (Box box : dragonHitboxes) {
+                double volume = calculateBoxVolume(box);
+                if (volume > largestVolume) {
+                    largestVolume = volume;
+                    largestBox = box;
+                }
+            }
+            
+        } catch (Exception e) {
+            // Fallback to standard bounding box if reflection fails
+            return dragon.getBoundingBox().expand(1.0); // Slightly larger for better targeting
+        }
+        
+        return largestBox;
+    }
+    
+    /**
+     * Gets the largest hitbox from a Wither's multiple parts
+     * Based on official Minecraft data: Wither hitbox is 3.5 blocks tall, 0.9 blocks wide
+     */
+    private Box getLargestWitherHitbox(WitherEntity wither) {
+        Box largestBox = wither.getBoundingBox();
+        double largestVolume = calculateBoxVolume(largestBox);
+        
+        try {
+            java.util.List<Box> witherHitboxes = new java.util.ArrayList<>();
+            
+            // Add the main body bounding box (this is typically the largest and most reliable)
+            witherHitboxes.add(wither.getBoundingBox());
+            
+            Vec3d witherPos = wither.getPos();
+            float yaw = wither.getYaw();
+            
+            // Wither's actual hitbox dimensions based on MC Wiki:
+            // Height: 3.5 blocks, Width: 0.9 blocks (much narrower than visual appearance)
+            // The main body extends from feet to about 2.5 blocks up
+            Box mainBodyBox = new Box(
+                witherPos.x - 0.45, witherPos.y, witherPos.z - 0.45,
+                witherPos.x + 0.45, witherPos.y + 2.5, witherPos.z + 0.45
+            );
+            witherHitboxes.add(mainBodyBox);
+            
+            // Central head area (main targeting head) - positioned above body
+            // According to wiki, main head skulls spawn 3 blocks above body
+            Box centralHeadBox = new Box(
+                witherPos.x - 0.45, witherPos.y + 2.5, witherPos.z - 0.45,
+                witherPos.x + 0.45, witherPos.y + 3.5, witherPos.z + 0.45
+            );
+            witherHitboxes.add(centralHeadBox);
+            
+            // Note: Side heads are dynamic and move independently in the actual game,
+            // but for targeting purposes, we can create approximate areas where they typically are.
+            // Side head skulls spawn 1.3 blocks offset from center horizontally
+            
+            // Calculate side head positions based on wither orientation
+            // Side heads are positioned to the left and right of the main body
+            double sideOffset = 1.3; // Based on MC Wiki data
+            
+            // Left side head (relative to wither's facing direction)
+            // To get perpendicular offset: rotate facing vector by 90 degrees
+            // Left = rotate facing direction 90° counter-clockwise
+            double leftHeadX = witherPos.x + Math.sin(Math.toRadians(yaw)) * sideOffset;
+            double leftHeadZ = witherPos.z - Math.cos(Math.toRadians(yaw)) * sideOffset;
+            Box leftHeadBox = new Box(
+                leftHeadX - 0.3, witherPos.y + 2.2, leftHeadZ - 0.3,
+                leftHeadX + 0.3, witherPos.y + 3.2, leftHeadZ + 0.3
+            );
+            witherHitboxes.add(leftHeadBox);
+            
+            // Right side head (relative to wither's facing direction)
+            // Right = rotate facing direction 90° clockwise
+            double rightHeadX = witherPos.x - Math.sin(Math.toRadians(yaw)) * sideOffset;
+            double rightHeadZ = witherPos.z + Math.cos(Math.toRadians(yaw)) * sideOffset;
+            Box rightHeadBox = new Box(
+                rightHeadX - 0.3, witherPos.y + 2.2, rightHeadZ - 0.3,
+                rightHeadX + 0.3, witherPos.y + 3.2, rightHeadZ + 0.3
+            );
+            witherHitboxes.add(rightHeadBox);
+            
+            // Find the largest box (typically the main body)
+            for (Box box : witherHitboxes) {
+                double volume = calculateBoxVolume(box);
+                if (volume > largestVolume) {
+                    largestVolume = volume;
+                    largestBox = box;
+                }
+            }
+            
+        } catch (Exception e) {
+            // Fallback to standard bounding box
+            return wither.getBoundingBox();
+        }
+        
+        return largestBox;
+    }
+    
+    /**
+     * Gets the optimal hitbox for armor stands based on their pose
+     */
+    private Box getLargestArmorStandHitbox(ArmorStandEntity armorStand) {
+        // Armor stands can have different poses affecting their hitbox
+        // Use the main body hitbox which is usually reliable
+        return armorStand.getBoundingBox();
+    }
+    
+    /**
+     * Calculates the volume of a bounding box
+     */
+    private double calculateBoxVolume(Box box) {
+        if (box == null) return 0.0;
+        double width = box.maxX - box.minX;
+        double height = box.maxY - box.minY;
+        double depth = box.maxZ - box.minZ;
+        return width * height * depth;
     }
 }

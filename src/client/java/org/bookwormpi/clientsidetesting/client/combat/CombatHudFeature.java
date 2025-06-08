@@ -43,10 +43,18 @@ public class CombatHudFeature {
     private static final float MAX_SCALE = 2.0f; // Maximum scale to prevent huge indicators
 
     // Range settings
-    private static final double BASE_TARGET_RANGE = 64.0;
+    private static final double BASE_TARGET_RANGE = 128.0;
 
     // Targeting system instance
     private static final TargetingSystem targetingSystem = new TargetingSystem();
+    
+    // Camera smoothing fields
+    private static float currentYaw = 0.0f;
+    private static float currentPitch = 0.0f;
+    private static float targetYaw = 0.0f;
+    private static float targetPitch = 0.0f;
+    private static boolean smoothingInitialized = false;
+    private static final float SMOOTHING_FACTOR = 0.60f; // Adjust for desired smoothing speed (0.1-0.3 recommended)
 
     public static void register() {
         // Register the new HUD layer for 2D overlay elements (aim lock indicators)
@@ -501,28 +509,54 @@ public class CombatHudFeature {
         ItemStack heldItem = client.player.getMainHandStack();
         if (!(heldItem.getItem() instanceof BowItem || heldItem.getItem() instanceof CrossbowItem)) {
             aimLockEnabled = false;
+            smoothingInitialized = false; // Reset smoothing when disabled
             return;
         }
 
         // Toggle aim lock status
         aimLockEnabled = !aimLockEnabled;
+        
+        // Reset smoothing when toggling aim lock
+        if (!aimLockEnabled) {
+            smoothingInitialized = false;
+        }
     }
 
     /**
-     * Updates player's view to look at the aim target
+     * Updates player's view to look at the aim target with smooth camera movement
      */
     private static void updatePlayerViewToTarget(MinecraftClient client, ItemStack weapon) {
         if (!targetingSystem.isTargetValid()) return;
+        
         List<Vec3d> dummyPath = new ArrayList<>();
         Vec3d aimPos = targetingSystem.calculateIdealAimPosition(targetingSystem.getCurrentTarget(), weapon, dummyPath);
         if (aimPos == null) return;
+        
         Vec3d playerPos = client.player.getEyePos();
         Vec3d direction = aimPos.subtract(playerPos).normalize();
         double horizontalDistance = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
-        float yaw = (float) Math.toDegrees(Math.atan2(direction.z, direction.x)) - 90.0F;
-        float pitch = (float) -Math.toDegrees(Math.atan2(direction.y, horizontalDistance));
-        client.player.setYaw(yaw);
-        client.player.setPitch(pitch);
+        
+        // Calculate target angles
+        targetYaw = (float) Math.toDegrees(Math.atan2(direction.z, direction.x)) - 90.0F;
+        targetPitch = (float) -Math.toDegrees(Math.atan2(direction.y, horizontalDistance));
+        
+        // Initialize smoothing on first use
+        if (!smoothingInitialized) {
+            currentYaw = client.player.getYaw();
+            currentPitch = client.player.getPitch();
+            smoothingInitialized = true;
+        }
+        
+        // Handle yaw wrapping (shortest path rotation)
+        float yawDiff = MathHelper.wrapDegrees(targetYaw - currentYaw);
+        currentYaw = MathHelper.wrapDegrees(currentYaw + yawDiff * SMOOTHING_FACTOR);
+        
+        // Smooth pitch interpolation
+        currentPitch = MathHelper.lerp(SMOOTHING_FACTOR, currentPitch, targetPitch);
+        
+        // Apply smoothed camera angles
+        client.player.setYaw(currentYaw);
+        client.player.setPitch(currentPitch);
     }
 
     /**
