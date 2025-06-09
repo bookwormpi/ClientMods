@@ -22,8 +22,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BlockSearchFeature {
+    private static final Logger LOGGER = LoggerFactory.getLogger("BlockSearchFeature");
+    
     public static boolean enabled = false;
     public static Block blockToSearch = Blocks.DIAMOND_BLOCK;
     public static int scanDistance = -1; // -1 means use render distance by default
@@ -35,6 +39,8 @@ public class BlockSearchFeature {
     private static final int MAX_SCAN_DISTANCE = 16;
     private static final AtomicBoolean scanning = new AtomicBoolean(false);
     private static long lastScanTick = 0;
+    private static long lastScanRequestTime = 0;
+    private static final long MIN_SCAN_INTERVAL_MS = 500; // Minimum 500ms between scans
     private static final Identifier BLOCK_SEARCH_LAYER = Identifier.of("clientsidetesting", "block-search-layer");
 
     public static void register() {
@@ -120,9 +126,18 @@ public class BlockSearchFeature {
     }
 
     public static void requestScan(MinecraftClient client, ChunkPos playerChunk, Block blockType) {
+        long currentTime = System.currentTimeMillis();
+        
+        // Prevent scan spam - enforce minimum interval between scans
+        if (currentTime - lastScanRequestTime < MIN_SCAN_INTERVAL_MS) {
+            return;
+        }
+        
         if (scanning.get()) {
             return; // Prevent concurrent scans
         }
+        
+        lastScanRequestTime = currentTime;
         scanning.set(true);
         CompletableFuture.runAsync(() -> {
             if (scanning.get() && Thread.currentThread().isInterrupted()) {
@@ -147,6 +162,8 @@ public class BlockSearchFeature {
         List<BlockPos> results = new ArrayList<>();
         int distance = scanDistance > 0 ? Math.min(scanDistance, MAX_SCAN_DISTANCE) : (client.options != null ? Math.min(client.options.getViewDistance().getValue(), MAX_SCAN_DISTANCE) : 8);
         BlockPos playerPos = client.player.getBlockPos();
+        
+        System.out.println("[BlockSearch] Scanning for " + blockType + " with distance " + distance + " chunks");
 
         // Generate chunk offsets sorted by distance from player chunk
         List<int[]> chunkOffsets = new ArrayList<>();
@@ -157,15 +174,20 @@ public class BlockSearchFeature {
         }
         chunkOffsets.sort((a, b) -> Integer.compare(a[0]*a[0] + a[1]*a[1], b[0]*b[0] + b[1]*b[1]));
 
+        int chunksScanned = 0;
+        int chunksLoaded = 0;
+        
         outer:
         for (int[] offset : chunkOffsets) {
             int dx = offset[0];
             int dz = offset[1];
             ChunkPos chunkPos = new ChunkPos(playerChunk.x + dx, playerChunk.z + dz);
             boolean loaded = client.world.getChunkManager().isChunkLoaded(chunkPos.x, chunkPos.z);
+            chunksScanned++;
             if (!loaded) {
                 continue;
             }
+            chunksLoaded++;
             var chunk = client.world.getChunk(chunkPos.x, chunkPos.z);
             var chunkSections = chunk.getSectionArray();
             int bottomY = chunk.getBottomY();
@@ -199,6 +221,8 @@ public class BlockSearchFeature {
                 }
             }
         }
+        
+        System.out.println("[BlockSearch] Scan complete: checked " + chunksScanned + " chunks, " + chunksLoaded + " were loaded, found " + results.size() + " blocks");
         return results;
     }
 
@@ -207,14 +231,20 @@ public class BlockSearchFeature {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.world == null || client.player == null) return;
         long now = client.world.getTime();
+        
         // Only scan if enough ticks have passed and not already scanning
-        if (!scanning.get() && (now - lastScanTick >= scanIntervalTicks)) {
+        // Increased interval for multiplayer stability
+        boolean isMultiplayer = client.getCurrentServerEntry() != null;
+        int effectiveScanInterval = isMultiplayer ? Math.max(scanIntervalTicks * 4, 20) : scanIntervalTicks; // 4x slower in multiplayer, min 1 second
+        
+        if (!scanning.get() && (now - lastScanTick >= effectiveScanInterval)) {
             requestScan(client, client.player.getChunkPos());
             lastScanTick = now;
         }
-        // Chunk movement trigger
+        
+        // Chunk movement trigger - but only if not already scanning
         ChunkPos currentChunk = client.player.getChunkPos();
-        if (lastPlayerChunk == null || !lastPlayerChunk.equals(currentChunk) || client != lastClient) {
+        if (!scanning.get() && (lastPlayerChunk == null || !lastPlayerChunk.equals(currentChunk) || client != lastClient)) {
             requestScan(client, currentChunk);
             lastPlayerChunk = currentChunk;
             lastClient = client;
@@ -294,6 +324,8 @@ public class BlockSearchFeature {
         foundBlocks.clear();
         // Force scanning flag to false so a new scan always starts
         scanning.set(false);
+        // Reset throttling for immediate user-requested scan
+        lastScanRequestTime = 0;
         // Immediately trigger a scan for the new block type
         if (MinecraftClient.getInstance().player != null) {
             requestScan(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos(), block);
@@ -301,10 +333,12 @@ public class BlockSearchFeature {
     }
 
     public static void setScanDistance(int distance) {
+        System.out.println("[BlockSearch] Setting scan distance: " + distance + " (Multiplayer: " + (MinecraftClient.getInstance().getCurrentServerEntry() != null) + ")");
         scanDistance = distance;
         if (enabled && MinecraftClient.getInstance().player != null) {
             foundBlocks.clear(); // Clear previous results
             scanning.set(false); // Ensure scan can run
+            lastScanRequestTime = 0; // Reset throttling for immediate user-requested scan
             requestScan(MinecraftClient.getInstance(), MinecraftClient.getInstance().player.getChunkPos());
             if (MinecraftClient.getInstance().world != null) {
                 MinecraftClient.getInstance().worldRenderer.reload();
