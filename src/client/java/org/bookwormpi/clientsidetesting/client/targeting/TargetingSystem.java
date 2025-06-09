@@ -28,13 +28,13 @@ public class TargetingSystem {
     private static final double MC_GRAVITY = 0.05; // Confirmed from MC Wiki
     private static final double MC_AIR_DRAG = 0.99; // Per-tick velocity multiplier in air
     private static final double MC_WATER_DRAG = 0.6; // Per-tick velocity multiplier in water
-    private static final double MC_INACCURACY_RANGE = 0.0172275; // ±inaccuracy range per axis
+    // private static final double MC_INACCURACY_RANGE = 0.0172275; // ±inaccuracy range per axis
     
-    // Weapon-specific physics
-    private static final float BOW_MIN_SPEED = 0.0f;
-    private static final float BOW_MAX_SPEED = 3.0f;
-    private static final float CROSSBOW_SPEED = 3.15f; // Confirmed from MC Wiki
-    private static final float DISPENSER_SPEED = 1.1f;
+    // // Weapon-specific physics
+    // private static final float BOW_MIN_SPEED = 0.0f;
+    // private static final float BOW_MAX_SPEED = 3.0f;
+    // private static final float CROSSBOW_SPEED = 3.15f; // Confirmed from MC Wiki
+    // private static final float DISPENSER_SPEED = 1.1f;
 
     private LivingEntity currentTarget;
     private long lastTargetSwitchTime;
