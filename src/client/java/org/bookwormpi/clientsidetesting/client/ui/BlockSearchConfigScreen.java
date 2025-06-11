@@ -1,4 +1,4 @@
-package org.bookwormpi.clientsidetesting.client;
+package org.bookwormpi.clientsidetesting.client.ui;
 
 import net.minecraft.block.Block;
 import net.minecraft.client.MinecraftClient;
@@ -8,6 +8,7 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
+import org.bookwormpi.clientsidetesting.client.features.BlockSearchFeature;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;

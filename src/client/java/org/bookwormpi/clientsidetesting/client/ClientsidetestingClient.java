@@ -9,8 +9,10 @@ import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.bookwormpi.clientsidetesting.client.combat.CombatHudFeature;
+import org.bookwormpi.clientsidetesting.client.features.BlockSearchFeature;
+import org.bookwormpi.clientsidetesting.client.ui.MainConfigScreen;
 
-public class ClientsidetestingClient implements ClientModInitializer {
+public class ClientSideTestingClient implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger("clientsidetesting");
     public static boolean showChunkPlayers = false;
     public static boolean showPlayerBoxes = false;
@@ -59,7 +61,7 @@ public class ClientsidetestingClient implements ClientModInitializer {
                 CombatHudFeature.handleAimLockKeyPress();
             }
             if (configScreenKey.wasPressed()) {
-                client.setScreen(new ClientsideTestingConfigScreen());
+                client.setScreen(new MainConfigScreen());
             }
         });
         

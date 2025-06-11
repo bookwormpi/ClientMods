@@ -1,4 +1,4 @@
-package org.bookwormpi.clientsidetesting.client;
+package org.bookwormpi.clientsidetesting.client.render;
 
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
@@ -8,6 +8,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
+import org.bookwormpi.clientsidetesting.client.ClientSideTestingClient;
 import com.mojang.blaze3d.systems.RenderSystem;
 
 public class PlayerBoxRenderFeature {
@@ -16,7 +17,7 @@ public class PlayerBoxRenderFeature {
     }
 
     private static void onWorldRender(WorldRenderContext context) {
-        if (!ClientsidetestingClient.showPlayerBoxes) return;
+        if (!ClientSideTestingClient.showPlayerBoxes) return;
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.world == null || client.player == null) return;
         MatrixStack matrices = context.matrixStack();

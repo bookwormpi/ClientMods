@@ -1,4 +1,4 @@
-package org.bookwormpi.clientsidetesting.client;
+package org.bookwormpi.clientsidetesting.client.features;
 
 import net.minecraft.client.render.*;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;

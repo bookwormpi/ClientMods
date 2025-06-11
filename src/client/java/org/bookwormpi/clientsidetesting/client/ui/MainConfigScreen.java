@@ -1,4 +1,4 @@
-package org.bookwormpi.clientsidetesting.client;
+package org.bookwormpi.clientsidetesting.client.ui;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -7,13 +7,15 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import org.bookwormpi.clientsidetesting.client.ClientSideTestingClient;
+import org.bookwormpi.clientsidetesting.client.features.BlockSearchFeature;
 
-public class ClientsideTestingConfigScreen extends Screen {
+public class MainConfigScreen extends Screen {
     private static final int BUTTON_HEIGHT = 18;
     private int scrollOffset = 0;
     private int contentHeight = 0;
 
-    public ClientsideTestingConfigScreen() {
+    public MainConfigScreen() {
         super(Text.literal("Clientside Testing Features"));
     }
 
@@ -41,22 +43,22 @@ public class ClientsideTestingConfigScreen extends Screen {
         ).dimensions(leftX, yLeft, buttonWidth, BUTTON_HEIGHT).build()).active = false;
         yLeft += BUTTON_HEIGHT + 2;
         this.addDrawableChild(ButtonWidget.builder(
-                Text.literal("Toggle HUD: " + (ClientsidetestingClient.showChunkPlayers ? "ON" : "OFF")),
-                btn -> { ClientsidetestingClient.showChunkPlayers = !ClientsidetestingClient.showChunkPlayers; }
+                Text.literal("Toggle HUD: " + (ClientSideTestingClient.showChunkPlayers ? "ON" : "OFF")),
+                btn -> { ClientSideTestingClient.showChunkPlayers = !ClientSideTestingClient.showChunkPlayers; }
         ).dimensions(leftX + indent, yLeft, buttonWidth - indent, BUTTON_HEIGHT).build());
         yLeft += BUTTON_HEIGHT + 2;
         this.addDrawableChild(ButtonWidget.builder(
-                Text.literal("Chunk Check Radius: " + ClientsidetestingClient.chunkCheckRadius),
+                Text.literal("Chunk Check Radius: " + ClientSideTestingClient.chunkCheckRadius),
                 btn -> {}
         ).dimensions(leftX + indent, yLeft, buttonWidth - indent, BUTTON_HEIGHT).build()).active = false;
         yLeft += BUTTON_HEIGHT + 2;
         this.addDrawableChild(ButtonWidget.builder(
                 Text.literal("-"),
-                btn -> { if (ClientsidetestingClient.chunkCheckRadius > 1) { ClientsidetestingClient.chunkCheckRadius--; } }
+                btn -> { if (ClientSideTestingClient.chunkCheckRadius > 1) { ClientSideTestingClient.chunkCheckRadius--; } }
         ).dimensions(leftX + indent, yLeft, 40, BUTTON_HEIGHT).build());
         this.addDrawableChild(ButtonWidget.builder(
                 Text.literal("+"),
-                btn -> { int maxRadius = MinecraftClient.getInstance().options.getViewDistance().getValue(); if (ClientsidetestingClient.chunkCheckRadius < maxRadius) { ClientsidetestingClient.chunkCheckRadius++; } }
+                btn -> { int maxRadius = MinecraftClient.getInstance().options.getViewDistance().getValue(); if (ClientSideTestingClient.chunkCheckRadius < maxRadius) { ClientSideTestingClient.chunkCheckRadius++; } }
         ).dimensions(leftX + indent + 50, yLeft, 40, BUTTON_HEIGHT).build());
         yLeft += BUTTON_HEIGHT + 2;
 
@@ -67,8 +69,8 @@ public class ClientsideTestingConfigScreen extends Screen {
         ).dimensions(leftX, yLeft, buttonWidth, BUTTON_HEIGHT).build()).active = false;
         yLeft += BUTTON_HEIGHT + 2;
         this.addDrawableChild(ButtonWidget.builder(
-                Text.literal("Toggle Combat HUD: " + (ClientsidetestingClient.showCombatHud ? "ON" : "OFF")),
-                btn -> { ClientsidetestingClient.showCombatHud = !ClientsidetestingClient.showCombatHud; this.init(); }
+                Text.literal("Toggle Combat HUD: " + (ClientSideTestingClient.showCombatHud ? "ON" : "OFF")),
+                btn -> { ClientSideTestingClient.showCombatHud = !ClientSideTestingClient.showCombatHud; this.init(); }
         ).dimensions(leftX + indent, yLeft, buttonWidth - indent, BUTTON_HEIGHT).build());
         yLeft += BUTTON_HEIGHT + 2;
         this.addDrawableChild(ButtonWidget.builder(
@@ -94,8 +96,8 @@ public class ClientsideTestingConfigScreen extends Screen {
         ).dimensions(rightX, yRight, buttonWidth, BUTTON_HEIGHT).build()).active = false;
         yRight += BUTTON_HEIGHT + 2;
         this.addDrawableChild(ButtonWidget.builder(
-                Text.literal("Toggle Boxes: " + (ClientsidetestingClient.showPlayerBoxes ? "ON" : "OFF")),
-                btn -> { ClientsidetestingClient.showPlayerBoxes = !ClientsidetestingClient.showPlayerBoxes; this.init(); }
+                Text.literal("Toggle Boxes: " + (ClientSideTestingClient.showPlayerBoxes ? "ON" : "OFF")),
+                btn -> { ClientSideTestingClient.showPlayerBoxes = !ClientSideTestingClient.showPlayerBoxes; this.init(); }
         ).dimensions(rightX + indent, yRight, buttonWidth - indent, BUTTON_HEIGHT).build());
         yRight += BUTTON_HEIGHT + sectionPad;
         // Right column: Block Search

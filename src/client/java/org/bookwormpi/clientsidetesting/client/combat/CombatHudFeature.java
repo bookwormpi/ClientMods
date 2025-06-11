@@ -20,7 +20,7 @@ import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
-import org.bookwormpi.clientsidetesting.client.ClientsidetestingClient;
+import org.bookwormpi.clientsidetesting.client.ClientSideTestingClient;
 import org.bookwormpi.clientsidetesting.client.targeting.TargetingSystem;
 
 import java.util.ArrayList;
@@ -73,7 +73,7 @@ public class CombatHudFeature {
      * Renders 2D overlay elements that should appear over the UI
      */
     private static void renderHudOverlay(DrawContext context, RenderTickCounter tickCounter) {
-        if (!ClientsidetestingClient.showCombatHud) return;
+        if (!ClientSideTestingClient.showCombatHud) return;
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.world == null || client.player == null) return;
@@ -151,7 +151,7 @@ public class CombatHudFeature {
      * Main render method, called after entities are rendered
      */
     private static void onWorldRender(WorldRenderContext context) {
-        if (!ClientsidetestingClient.showCombatHud) return;
+        if (!ClientSideTestingClient.showCombatHud) return;
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.world == null || client.player == null) return;
@@ -182,7 +182,7 @@ public class CombatHudFeature {
      * Client tick handler to detect when player hits a mob
      */
     private static void onClientTick(MinecraftClient client) {
-        if (!ClientsidetestingClient.showCombatHud) return;
+        if (!ClientSideTestingClient.showCombatHud) return;
         if (client.player == null || client.world == null) return;
 
         // Only monitor hits when holding bow or crossbow

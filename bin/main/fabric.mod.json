@@ -10,14 +10,11 @@
   "icon": "assets/clientsidetesting/icon.png",
   "environment": "client",
   "entrypoints": {
-    "fabric-datagen": [
-      "org.bookwormpi.clientsidetesting.client.ClientsidetestingDataGenerator"
-    ],
     "client": [
-      "org.bookwormpi.clientsidetesting.client.ClientsidetestingClient"
+      "org.bookwormpi.clientsidetesting.client.ClientSideTestingClient"
     ],
     "main": [
-      "org.bookwormpi.clientsidetesting.Clientsidetesting"
+      "org.bookwormpi.clientsidetesting.ClientSideTestingMod"
     ]
   },
   "mixins": [

@@ -1,4 +1,4 @@
-package org.bookwormpi.clientsidetesting.client;
+package org.bookwormpi.clientsidetesting.client.features;
 
 import net.fabricmc.fabric.api.client.rendering.v1.HudLayerRegistrationCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.IdentifiedLayer;
@@ -8,6 +8,7 @@ import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import org.bookwormpi.clientsidetesting.client.ClientSideTestingClient;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,12 +25,12 @@ public class ChunkPlayersHudFeature {
     }
 
     private static void render(DrawContext context, RenderTickCounter tickCounter) {
-            if (!ClientsidetestingClient.showChunkPlayers) return;
+            if (!ClientSideTestingClient.showChunkPlayers) return;
             MinecraftClient client = MinecraftClient.getInstance();
             if (client.world == null || client.player == null) return;
 
             int renderDistance = client.options.getViewDistance().getValue();
-            int chunkRadius = Math.min(ClientsidetestingClient.chunkCheckRadius, renderDistance);
+            int chunkRadius = Math.min(ClientSideTestingClient.chunkCheckRadius, renderDistance);
 
             playersInChunk.clear();
             int localChunkX = client.player.getChunkPos().x;
