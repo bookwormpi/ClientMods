@@ -14,6 +14,19 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Configuration screen for selecting blocks to search for.
+ * Provides a JEI-like interface with search functionality and block grid display.
+ * 
+ * Features:
+ * - Searchable block list with filtering by name and ID
+ * - Visual block icons with tooltips
+ * - Scrollable grid layout (9 columns, 8 rows)
+ * - Mouse and keyboard navigation
+ * 
+ * @author bookwormpi
+ * @since 1.1.0
+ */
 public class BlockSearchConfigScreen extends Screen {
     private final Screen parent;
     private final List<Block> allBlocks;

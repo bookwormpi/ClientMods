@@ -1,0 +1,27 @@
+{
+  "key.clientsidetesting.target_cycle": "Cycle Combat Target",
+  "key.clientsidetesting.aim_lock": "Toggle Aim Lock",
+  "key.clientsidetesting.config": "Open Config Screen",
+  "key.clientsidetesting.block_search_toggle": "Toggle Block Search",
+  
+  "category.clientsidetesting.general": "ClientSide Testing",
+  "category.clientsidetesting.combat": "Combat Features",
+  
+  "text.clientsidetesting.config.title": "ClientSide Testing Configuration",
+  "text.clientsidetesting.config.chunk_hud": "Chunk HUD",
+  "text.clientsidetesting.config.combat_hud": "Combat HUD", 
+  "text.clientsidetesting.config.player_boxes": "Player Boxes",
+  "text.clientsidetesting.config.block_search": "Block Search",
+  
+  "blocksearch.screen.title": "Select Block to Search",
+  "blocksearch.search.placeholder": "Search blocks...",
+  
+  "text.clientsidetesting.hud.closest_block": "Closest %s:",
+  "text.clientsidetesting.hud.distance": "Distance: %dm",
+  "text.clientsidetesting.hud.coordinates": "(%d, %d, %d)",
+  "text.clientsidetesting.hud.no_blocks_found": "No %s found nearby",
+  
+  "text.clientsidetesting.combat.target_locked": "Target Locked",
+  "text.clientsidetesting.combat.aim_lock_enabled": "Aim Lock: Enabled",
+  "text.clientsidetesting.combat.aim_lock_disabled": "Aim Lock: Disabled"
+}

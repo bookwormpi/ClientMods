@@ -2,11 +2,15 @@
   "schemaVersion": 1,
   "id": "clientsidetesting",
   "version": "${version}",
-  "name": "ClientSideTesting",
-  "description": "",
-  "authors": [],
-  "contact": {},
-  "license": "All-Rights-Reserved",
+  "name": "ClientSide Testing",
+  "description": "A comprehensive client-side utility mod featuring block search, combat HUD, player tracking, and more.",
+  "authors": ["bookwormpi"],
+  "contact": {
+    "homepage": "https://github.com/bookwormpi/ClientMods",
+    "sources": "https://github.com/bookwormpi/ClientMods",
+    "issues": "https://github.com/bookwormpi/ClientMods/issues"
+  },
+  "license": "MIT",
   "icon": "assets/clientsidetesting/icon.png",
   "environment": "client",
   "entrypoints": {
@@ -15,6 +19,9 @@
     ],
     "main": [
       "org.bookwormpi.clientsidetesting.ClientSideTestingMod"
+    ],
+    "modmenu": [
+      "org.bookwormpi.clientsidetesting.client.compat.ModMenuIntegrationImpl"
     ]
   },
   "mixins": [
@@ -26,7 +33,20 @@
   ],
   "depends": {
     "fabricloader": ">=${loader_version}",
-    "fabric": "*",
-    "minecraft": "${minecraft_version}"
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}",
+    "java": ">=21"
+  },
+  "suggests": {
+    "sodium": "*",
+    "iris": "*",
+    "modmenu": "*"
+  },
+  "custom": {
+    "modmenu": {
+      "badges": ["client"],
+      "parent": "clientsidetesting"
+    },
+    "cardinal-components": false
   }
 }

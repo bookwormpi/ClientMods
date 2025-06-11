@@ -10,7 +10,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.bookwormpi.clientsidetesting.client.combat.CombatHudFeature;
 import org.bookwormpi.clientsidetesting.client.features.BlockSearchFeature;
+import org.bookwormpi.clientsidetesting.client.features.BlockSearchCommand;
 import org.bookwormpi.clientsidetesting.client.ui.MainConfigScreen;
+import org.bookwormpi.clientsidetesting.client.debug.DebugCommands;
+import org.bookwormpi.clientsidetesting.client.utils.CompatibilityChecker;
 
 public class ClientSideTestingClient implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger("clientsidetesting");
@@ -68,6 +71,16 @@ public class ClientSideTestingClient implements ClientModInitializer {
         // Register features
         CombatHudFeature.register();
         BlockSearchFeature.register();
+        
+        // Register commands
+        BlockSearchCommand.register();
+        DebugCommands.register();
+        
+        // Check compatibility
+        CompatibilityChecker.CompatibilityResult compatResult = CompatibilityChecker.checkCompatibility();
+        if (!compatResult.compatible) {
+            LOGGER.warn("Compatibility issues detected: {}", compatResult.message);
+        }
         
         LOGGER.info("Client Side Testing mod initialized");
     }

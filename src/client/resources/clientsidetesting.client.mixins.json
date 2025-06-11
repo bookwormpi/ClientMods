@@ -3,9 +3,13 @@
   "minVersion": "0.8",
   "package": "org.bookwormpi.clientsidetesting.mixin.client",
   "compatibilityLevel": "JAVA_21",
+  "refmap": "clientsidetesting.refmap.json",
   "client": [
+    "WorldRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1
-  }
+  },
+  "mixins": [],
+  "verbose": false
 }
