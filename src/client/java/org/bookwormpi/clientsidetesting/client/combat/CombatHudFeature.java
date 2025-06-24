@@ -97,7 +97,7 @@ public class CombatHudFeature {
         double time = client.world.getTime() * 0.1;
         
         // Enhanced status indicator when aim lock is enabled with consistent fade in/out animation
-        if (aimLockEnabled && targetingSystem.isTargetValid()) {
+        if (aimLockEnabled && targetingSystem.isTargetValid(targetingSystem.getCurrentTarget())) {
             // Calculate consistent fade in/out alpha using absolute sine for smooth transitions
             float fadeAlpha = (float) (0.3 + 0.7 * Math.abs(Math.sin(time * 1.5))); // 30%-100% opacity range
             int alpha = (int) (fadeAlpha * 255);
@@ -111,7 +111,7 @@ public class CombatHudFeature {
         }
         
         // Target information panel - show when we have a valid target
-        if (targetingSystem.isTargetValid()) {
+        if (targetingSystem.isTargetValid(targetingSystem.getCurrentTarget())) {
             LivingEntity target = targetingSystem.getCurrentTarget();
             Vec3d playerPos = client.player.getEyePos();
             Vec3d targetPos = target.getPos().add(0, target.getHeight() * 0.5, 0);
@@ -170,9 +170,8 @@ public class CombatHudFeature {
         renderEntitySquares(matrices, vertexConsumers, cameraPos);
 
         // Draw aim prediction circle if we have a valid target
-        if (targetingSystem.isTargetValid()) {
+        if (targetingSystem.isTargetValid(targetingSystem.getCurrentTarget())) {
             renderAimAssistCircle(matrices, vertexConsumers, cameraPos, heldItem);
-            renderPredictedPath(matrices, vertexConsumers, cameraPos, heldItem);
         }
 
         vertexConsumers.draw(); // Important: draw after all rendering is done
@@ -200,7 +199,7 @@ public class CombatHudFeature {
         }
 
         // Handle aim lock if enabled
-        if (aimLockEnabled && targetingSystem.isTargetValid()) {
+        if (aimLockEnabled && targetingSystem.isTargetValid(targetingSystem.getCurrentTarget())) {
             updatePlayerViewToTarget(client, heldItem);
         }
     }
@@ -384,33 +383,6 @@ public class CombatHudFeature {
     }
 
     /**
-     * Renders the predicted projectile path in the world using line segments.
-     */
-    private static void renderPredictedPath(MatrixStack matrices, VertexConsumerProvider vertexConsumers, Vec3d cameraPos, ItemStack weapon) {
-        List<Vec3d> path = targetingSystem.getPredictedPath(targetingSystem.getCurrentTarget(), weapon);
-        if (path.size() < 2) return;
-        VertexConsumer lines = vertexConsumers.getBuffer(RenderLayer.getLines());
-        matrices.push();
-        for (int i = 1; i < path.size(); i++) {
-            Vec3d p0 = path.get(i - 1);
-            Vec3d p1 = path.get(i);
-            double x0 = p0.x - cameraPos.x;
-            double y0 = p0.y - cameraPos.y;
-            double z0 = p0.z - cameraPos.z;
-            double x1 = p1.x - cameraPos.x;
-            double y1 = p1.y - cameraPos.y;
-            double z1 = p1.z - cameraPos.z;
-            lines.vertex(matrices.peek().getPositionMatrix(), (float)x0, (float)y0, (float)z0)
-                .color(1.0f, 1.0f, 0.0f, 0.8f)
-                .normal(0.0f, 1.0f, 0.0f);
-            lines.vertex(matrices.peek().getPositionMatrix(), (float)x1, (float)y1, (float)z1)
-                .color(1.0f, 1.0f, 0.0f, 0.8f)
-                .normal(0.0f, 1.0f, 0.0f);
-        }
-        matrices.pop();
-    }
-
-    /**
      * Calculates appropriate scale based on distance to maintain consistent visual size
      */
     private static float calculateDistanceScale(double distance) {
@@ -526,8 +498,8 @@ public class CombatHudFeature {
      * Updates player's view to look at the aim target with smooth camera movement
      */
     private static void updatePlayerViewToTarget(MinecraftClient client, ItemStack weapon) {
-        if (!targetingSystem.isTargetValid()) return;
-        
+        if (!targetingSystem.isTargetValid(targetingSystem.getCurrentTarget())) return;
+
         List<Vec3d> dummyPath = new ArrayList<>();
         Vec3d aimPos = targetingSystem.calculateIdealAimPosition(targetingSystem.getCurrentTarget(), weapon, dummyPath);
         if (aimPos == null) return;
