@@ -1,13 +1,11 @@
 package org.bookwormpi.clientsidetesting.client.targeting;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.boss.dragon.EnderDragonEntity;
 import net.minecraft.entity.boss.WitherEntity;
 import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.passive.BatEntity;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.BowItem;
 import net.minecraft.item.CrossbowItem;
 import net.minecraft.item.ItemStack;
@@ -21,8 +19,8 @@ public class TargetingSystem {
     private static final double TARGET_RANGE = 128.0;
     
     // Minecraft-accurate physics constants (from MC Wiki research)
-    private static final double MC_GRAVITY = 0.05; // Confirmed from MC Wiki
-    private static final double MC_AIR_DRAG = 0.99; // Per-tick velocity multiplier in air
+    private static final double MC_GRAVITY = 0.05;   // Confirmed from MC Wiki
+    private static final double MC_AIR_DRAG = 0.99;  // Per-tick velocity multiplier in air
     private static final double MC_WATER_DRAG = 0.6; // Per-tick velocity multiplier in water
     // private static final double MC_INACCURACY_RANGE = 0.0172275; // ±inaccuracy range per axis
     
@@ -52,10 +50,10 @@ public class TargetingSystem {
                 playerPos.x - TARGET_RANGE, playerPos.y - TARGET_RANGE, playerPos.z - TARGET_RANGE,
                 playerPos.x + TARGET_RANGE, playerPos.y + TARGET_RANGE, playerPos.z + TARGET_RANGE);
 
-        for (Entity entity : client.world.getEntitiesByClass(LivingEntity.class, searchBox, 
+        for (LivingEntity entity : client.world.getEntitiesByClass(LivingEntity.class, searchBox, 
                 e -> (isTargetValid(e)))) {
-            if (entity instanceof LivingEntity livingEntity) { // Make sure it's not dead.
-                entities.add(livingEntity);
+            if (isTargetValid(entity)) { // Make sure it's not dead.
+                entities.add(entity);
             }
         }
         // Sort by distance to player
@@ -275,7 +273,25 @@ public class TargetingSystem {
     }
 
     public boolean isTargetValid(LivingEntity entity) {
-        return entity != null && entity.isAlive() && !(entity instanceof BatEntity) || (entity instanceof PlayerEntity); // Ignore bats, but keep players
+        MinecraftClient client = MinecraftClient.getInstance();
+        
+        // Basic validity checks
+        if (entity == null || !entity.isAlive()) {
+            return false;
+        }
+        
+        // Never target the current player
+        if (entity.equals(client.player)) {
+            return false;
+        }
+        
+        // Don't target bats
+        if (entity instanceof BatEntity) {
+            return false;
+        }
+        
+        // Target all other living entities (including other players)
+        return true;
     }
 
     /**
